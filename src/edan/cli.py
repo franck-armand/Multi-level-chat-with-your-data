@@ -6,7 +6,7 @@ from pathlib import Path
 from .extract_docx import extract_docx_to_csv
 from .validate import run_validations
 from .db import load_csv_to_db
-from .agent.agent import generate_sql, looks_malicious
+from .agent.agent import plan_question, looks_malicious
 from .sql.exec import run_query
 
 def main() -> None:
@@ -56,14 +56,20 @@ def main() -> None:
             print("Refused: unsafe request (destructive or exfiltration attempt).")
             return
 
-        sql = generate_sql(args.q)
-        if not sql:
+        plan = plan_question(args.q)
+        if not plan:
             print("Not found in the provided PDF dataset.")
             print("Tip: ask about seats, rankings, participation rates, winners by party, etc.")
             return
 
-        df, final_sql = run_query(args.db, sql, limit=args.limit)
+        df, final_sql = run_query(args.db, plan.sql, limit=args.limit)
 
+        print("*" * 30)
+        if plan.narrative:
+            print(plan.narrative)
         print("SQL used:\n", final_sql)
         print("\nResult preview:")
         print(df.head(20).to_string(index=False))
+        print("*" * 30)
+
+ 
