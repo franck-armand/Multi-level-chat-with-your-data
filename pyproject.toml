@@ -1,0 +1,30 @@
+[project]
+name = "edan-chat"
+version = "0.1.0"
+description = "Reproducible pipeline to extract, validate, and query the EDAN 2025 election results dataset."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name="Franck Kouassi"}]
+license = {text = "MIT"}
+dependencies = [
+    "duckdb>=1.4.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6.0",
+]
+
+[project.scripts]
+edan = "edan.cli:main"
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
