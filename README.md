@@ -1,6 +1,6 @@
 # EDAN 2025
 
-This project produces a **clean, deterministic** export from the official dataset.
+A reproducible project to ingest an official CEI elections results PDF and (next) build a “chat with your data” experience on top of it.
 
 **Source of truth**
 - `EDAN_2025_RESULTAT_NATIONAL_DETAILS.pdf` (official)
@@ -9,7 +9,7 @@ This project produces a **clean, deterministic** export from the official datase
 We parse the **DOCX tables** (WordprocessingML) because PDF text extraction introduced layout/rotation issues
 and header bleed. The DOCX keeps the table structure, allowing a perfect export.
 
-## 1) Setup (uv)
+### 1. Setup (uv)
 
 ```bash
 uv venv
@@ -24,7 +24,7 @@ uv pip install -e .
 uv pip install -e ".[dev]"
 ```
 
-## 2) Extract to CSV (semicolon-delimited)
+### 2. Extract to CSV (semicolon-delimited)
 
 ```bash
 edan extract --docx /path/to/EDAN_2025_RESULTAT_NATIONAL_DETAILS.docx --out data/edan_results.csv
@@ -32,13 +32,13 @@ edan extract --docx /path/to/EDAN_2025_RESULTAT_NATIONAL_DETAILS.docx --out data
 
 The extractor writes `;`-delimited CSV to avoid ambiguity with commas in French numbers.
 
-## 3) Validate (must pass before submission)
+### 3. Validate (must pass before submission)
 
 ```bash
 edan validate --csv data/edan_results.csv
 ```
 
-## 4) Load into DuckDB (Level 1 readiness)
+### 4. Load into DuckDB (Level 1 readiness)
 
 ```bash
 edan load-db --csv data/edan_results.csv --db data/edan.duckdb --table election_results
@@ -47,7 +47,7 @@ edan load-db --csv data/edan_results.csv --db data/edan.duckdb --table election_
 # edan load-db --engine sqlite --csv data/edan_results.csv --db data/edan.sqlite --table election_results
 ```
 
-## 5) Example SQL sanity checks
+### 5. Example SQL sanity checks
 
 ```sql
 -- distinct constituencies
@@ -60,7 +60,7 @@ GROUP BY circonscription_code
 HAVING MAX(suf_exprimes) + MAX(bull_nuls) != MAX(votants);
 ```
 
-## Project layout
+### Project layout
 
 - `src/edan/extract_docx.py`  DOCX -> records
 - `src/edan/normalize.py`     cleaning/normalization (“formatting section”)
@@ -68,7 +68,7 @@ HAVING MAX(suf_exprimes) + MAX(bull_nuls) != MAX(votants);
 - `src/edan/db.py`            SQLite loader
 - `src/edan/cli.py`           CLI entrypoint (`edan ...`)
 
-## Reproducibility notes
+### Reproducibility notes
 
 - Deterministic parsing (no ML/OCR).
 - CSV is semicolon-delimited.
