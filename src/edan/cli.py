@@ -5,8 +5,9 @@ from pathlib import Path
 
 from .extract_docx import extract_docx_to_csv
 from .validate import run_validations
-from .db import load_csv_to_sqlite
-
+from .db import load_csv_to_db
+from .agent.agent import generate_sql, looks_malicious
+from .sql.exec import run_query
 
 def main() -> None:
     p = argparse.ArgumentParser(prog="edan", description="EDAN 2025 extraction + validation + DB utilities")
@@ -27,6 +28,11 @@ def main() -> None:
     p_db.add_argument("--table", default="election_results", help="Table name")
     p_db.add_argument("--delimiter", default=";", help="CSV delimiter (default: ;)")
     p_db.add_argument("--engine", choices=["duckdb", "sqlite"], default="duckdb", help="DB engine")
+    
+    p_ask = sub.add_parser("ask", help="Ask a question (intent->SQL->safe exec) against the DuckDB")
+    p_ask.add_argument("--db", required=True, type=Path, help="DuckDB path")
+    p_ask.add_argument("--q", required=True, help="User question")
+    p_ask.add_argument("--limit", type=int, default=200, help="Max rows to return")
 
     args = p.parse_args()
 
@@ -37,5 +43,27 @@ def main() -> None:
         run_validations(args.csv, delimiter=args.delimiter)
         print("[OK] Validation passed")
     elif args.cmd == "load-db":
-        load_csv_to_sqlite(args.csv, args.db, table=args.table, delimiter=args.delimiter)
-        print(f"[OK] Loaded DB: {args.db} (table: {args.table})")
+        load_csv_to_db(
+            args.csv,
+            args.db,
+            table=args.table,
+            delimiter=args.delimiter,
+            engine=args.engine,
+        )
+        print(f"[OK] Loaded DB: {args.db} (engine: {args.engine}, table: {args.table})")
+    elif args.cmd == "ask":
+        if looks_malicious(args.q):
+            print("Refused: unsafe request (destructive or exfiltration attempt).")
+            return
+
+        sql = generate_sql(args.q)
+        if not sql:
+            print("Not found in the provided PDF dataset.")
+            print("Tip: ask about seats, rankings, participation rates, winners by party, etc.")
+            return
+
+        df, final_sql = run_query(args.db, sql, limit=args.limit)
+
+        print("SQL used:\n", final_sql)
+        print("\nResult preview:")
+        print(df.head(20).to_string(index=False))

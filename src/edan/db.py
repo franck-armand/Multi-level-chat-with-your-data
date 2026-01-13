@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from .normalize import parse_int, parse_percent, clean_text
+from edan.sql.views import create_views
 
 
 def load_csv_to_sqlite(
@@ -150,6 +151,9 @@ def load_csv_to_duckdb(
         f"INSERT INTO {table} VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         rows,
     )
+    
+    # Create views
+    create_views(conn, table=table)
     conn.close()
 
 

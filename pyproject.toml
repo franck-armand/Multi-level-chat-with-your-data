@@ -8,6 +8,8 @@ authors = [{name="Franck Kouassi"}]
 license = {text = "MIT"}
 dependencies = [
     "duckdb>=1.4.3",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
 ]
 
 [project.optional-dependencies]
