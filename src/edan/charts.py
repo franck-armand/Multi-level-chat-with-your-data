@@ -17,8 +17,8 @@ def _require_columns(df: pd.DataFrame, cols: list[str]) -> None:
 def make_chart_payload(
     df: pd.DataFrame,
     chart_type: str,
-    x: str,
-    y: str,
+    x: str | None,
+    y: str | None,
     title: Optional[str] = None,
 ):
     """
@@ -30,15 +30,15 @@ def make_chart_payload(
     if chart_type not in {"bar", "hist", "pie"}:
         raise ChartError(f"Unsupported chart_type: {chart_type}")
 
-    _require_columns(df, [x, y])
-
-    # Clean and coerce numeric y
-    plot_df = df[[x, y]].copy()
-    plot_df[y] = pd.to_numeric(plot_df[y], errors="coerce")
-    plot_df = plot_df.dropna(subset=[y])
-
     if chart_type == "hist":
-        # histogram expects y as numeric values (binning done in UI or here later)
+        if not y:
+            raise ChartError("Histogram requires 'y' column name (e.g., score).")
+        _require_columns(df, [y])
+
+        plot_df = df[[y]].copy()
+        plot_df[y] = pd.to_numeric(plot_df[y], errors="coerce")
+        plot_df = plot_df.dropna(subset=[y])
+
         return {
             "type": "hist",
             "title": title or f"Histogram of {y}",
@@ -46,9 +46,16 @@ def make_chart_payload(
             "data": plot_df[y].tolist(),
         }
 
+    # bar + pie need x and y
+    if not x or not y:
+        raise ChartError(f"{chart_type} chart requires both x and y column names.")
+    _require_columns(df, [x, y])
+
+    plot_df = df[[x, y]].copy()
+    plot_df[y] = pd.to_numeric(plot_df[y], errors="coerce")
+    plot_df = plot_df.dropna(subset=[y])
+
     if chart_type == "pie":
-        # pie expects categories + values
-        # aggregate if repeated categories
         agg = plot_df.groupby(x, as_index=False)[y].sum()
         return {
             "type": "pie",
@@ -58,7 +65,6 @@ def make_chart_payload(
         }
 
     # bar
-    # If repeated categories, aggregate
     agg = plot_df.groupby(x, as_index=False)[y].sum().sort_values(by=y, ascending=False)
     return {
         "type": "bar",

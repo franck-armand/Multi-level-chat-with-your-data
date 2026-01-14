@@ -7,7 +7,7 @@ DEFAULT_DB = Path("data/edan.duckdb")
 def setup_page():
     st.set_page_config(page_title="EDAN Chat", page_icon="", layout="wide")
     st.title("EDAN Chat")
-    st.caption("Dataset-only answers (Level 1 SQL). Later: Hybrid SQL+RAG.")
+    st.caption("Dataset-only answers (Level 1 SQL).")
 
 def sidebar_controls():
     st.sidebar.header("Settings")
