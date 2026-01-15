@@ -103,7 +103,7 @@ edan validate --csv data/edan_results.csv
 ### 4. Load into DuckDB (Level 1 readiness)
 
 ```bash
-edan load-db --csv data/edan_results.csv --db data/edan.duckdb --table election_results
+edan load-db --engine duckdb --csv data/edan_results.csv --db data/edan.duckdb --table election_results
 
 # If you prefer SQLite instead: (I implemented both for benchmark later on)
 # edan load-db --engine sqlite --csv data/edan_results.csv --db data/edan.sqlite --table election_results
