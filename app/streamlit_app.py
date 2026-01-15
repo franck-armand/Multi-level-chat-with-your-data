@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv(override=False)
+
 from ui.layout import setup_page, sidebar_controls
 from core.router import run_app
 
