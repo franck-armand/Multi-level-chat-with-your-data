@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from edan.entities.normalize import normalize_for_match
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -25,7 +27,10 @@ def node_resolve(state: L2State) -> L2State:
 
 def node_route(state: L2State) -> L2State:
     q = state.user_query
+    q_low = q.lower()
+    q_norm = normalize_for_match(q)
 
+    # 0) Safety first
     if looks_malicious(q):
         state.route = "blocked"
         state.answer = (
@@ -34,24 +39,182 @@ def node_route(state: L2State) -> L2State:
         )
         return state
 
-    # If Level 1 planner can handle it, route to SQL
+    # 1) If Level 1 planner can handle it, prefer that SQL (charts/rankings already implemented there)
     plan = plan_question(q)
-    
-    # Hybrid: if we resolved a party and user asks about seats, answer via SQL
-    q_low = q.lower()
-    if state.resolved and state.resolved.party and ("seat" in q_low or "seats" in q_low or "siege" in q_low or "sieges" in q_low):
-        state.route = "sql"
-        party = state.resolved.party.replace("'", "''")
-        state.sql = f"SELECT party, seats FROM vw_party_seats WHERE party = '{party}';"
-        return state
-
     if plan is not None:
         state.route = "sql"
         state.sql = plan.sql
         return state
 
-    # Otherwise route to RAG
-    # Also: if we detected some entity but planner doesn't have template, RAG can still help.
+    # Helper: detect analytics intent (Level 2 requirement)
+    analytics_keywords = [
+        "how many", "count", "number of", "top", "rank", "seats", "siege", "turnout",
+        "participation", "average", "avg", "sum", "total", "by region", "by party",
+    ]
+    is_analytics = any(k in q_low for k in analytics_keywords)
+
+    # Helper: extract acronym from single-letter tokens in user query: "p d c i" -> "pdci"
+    def extract_acronym(norm_text: str) -> str | None:
+        toks = norm_text.split()
+        buf = []
+        acronyms = []
+        for t in toks:
+            if len(t) == 1 and t.isalnum():
+                buf.append(t)
+            else:
+                if len(buf) >= 3:
+                    acronyms.append("".join(buf))
+                buf = []
+        if len(buf) >= 3:
+            acronyms.append("".join(buf))
+        # take the longest acronym
+        if not acronyms:
+            return None
+        acronyms.sort(key=len, reverse=True)
+        return acronyms[0]
+
+    # Helper: safe SQL string literal
+    def sql_str(s: str) -> str:
+        return s.replace("'", "''")
+
+    # 2.0) GLOBAL TOTALS (use vw_turnout to avoid duplicate candidate rows)
+    if "total" in q_low:
+        metric_map = {
+            "inscrits": "inscrits",
+            "registered": "inscrits",
+            "register": "inscrits",
+            "votants": "votants",
+            "voters": "votants",
+            "votes": "votants", 
+            "exprimes": "suf_exprimes",
+            "expressed": "suf_exprimes",
+            "nuls": "bull_nuls",
+            "null": "bull_nuls",
+            "blancs": "bull_blancs_nbr",
+            "blank": "bull_blancs_nbr",
+        }
+
+        # decide which metric user likely wants
+        chosen = None
+        for k, col in metric_map.items():
+            if k in q_low:
+                chosen = col
+                break
+
+        # special case: "total votes by candidates" -> sum(score)
+        if "candidate" in q_low or "candidates" in q_low:
+            state.route = "sql"
+            state.sql = "SELECT SUM(score) AS total_candidate_votes FROM vw_results_clean;"
+            return state
+
+        if chosen:
+            state.route = "sql"
+            state.sql = f"SELECT SUM({chosen}) AS total_{chosen} FROM vw_turnout;"
+            return state
+
+        # If user said "total votes" but not clear, return a safe helpful default
+        if "total votes" in q_low or ("total" in q_low and "vote" in q_low):
+            state.route = "sql"
+            state.sql = "SELECT SUM(votants) AS total_votants FROM vw_turnout;"
+            return state
+
+    
+    # 2) HYBRID: build SQL dynamically from resolved entities for analytics questions
+    if is_analytics and state.resolved is not None:
+        r = state.resolved
+
+        # 2a) Seats queries (party seats)
+        if ("seat" in q_low or "seats" in q_low or "siege" in q_low or "sieges" in q_low):
+            # Try exact party if resolved
+            if r.party:
+                party = sql_str(r.party)
+                # Also compute a "family key" from the first token of the party label (before '-' or space)
+                # This generalizes to PDCI, RHDP, etc.
+                fam = normalize_for_match(r.party)
+                fam = re.split(r"[\s\-]+", fam)[0] if fam else ""
+
+                if fam and len(fam) >= 3:
+                    state.sql = (
+                        "SELECT party, seats FROM vw_party_seats "
+                        f"WHERE party = '{party}' OR lower(party) LIKE '%{sql_str(fam)}%' "
+                        "ORDER BY seats DESC;"
+                    )
+                else:
+                    state.sql = f"SELECT party, seats FROM vw_party_seats WHERE party = '{party}';"
+
+                state.route = "sql"
+                return state
+
+            # If no party resolved, but user typed an acronym (P.D.C.I / R.H.D.P)
+            ac = extract_acronym(q_norm)
+            if ac:
+                ac = ac.lower()
+                state.sql = (
+                    "SELECT party, seats FROM vw_party_seats "
+                    f"WHERE lower(party) LIKE '%{sql_str(ac)}%' "
+                    "ORDER BY seats DESC;"
+                )
+                state.route = "sql"
+                return state
+
+        # 2b) Winner queries by code/region/circonscription
+        if ("winner" in q_low or "winners" in q_low or "who won" in q_low or "elu" in q_low):
+            if r.circonscription_code:
+                code = sql_str(r.circonscription_code)
+                state.sql = (
+                    "SELECT region, circonscription_code, circonscription_name, party, candidate, score "
+                    "FROM vw_winners "
+                    f"WHERE circonscription_code = '{code}';"
+                )
+                state.route = "sql"
+                return state
+
+            if r.region:
+                region = sql_str(r.region)
+                state.sql = (
+                    "SELECT circonscription_code, circonscription_name, party, candidate, score "
+                    "FROM vw_winners "
+                    f"WHERE region = '{region}' "
+                    "ORDER BY circonscription_code;"
+                )
+                state.route = "sql"
+                return state
+
+            if r.circonscription:
+                circo = sql_str(r.circonscription)
+                state.sql = (
+                    "SELECT region, circonscription_code, circonscription_name, party, candidate, score "
+                    "FROM vw_winners "
+                    f"WHERE circonscription_name = '{circo}';"
+                )
+                state.route = "sql"
+                return state
+
+        # 2c) Turnout / participation queries by region or code
+        if ("turnout" in q_low or "participation" in q_low):
+            if r.circonscription_code:
+                code = sql_str(r.circonscription_code)
+                state.sql = (
+                    "SELECT * FROM vw_turnout "
+                    f"WHERE circonscription_code = '{code}';"
+                )
+                state.route = "sql"
+                return state
+
+            if r.region:
+                region = sql_str(r.region)
+                state.sql = (
+                    "SELECT * FROM vw_turnout "
+                    f"WHERE region = '{region}' "
+                    "ORDER BY circonscription_code;"
+                )
+                state.route = "sql"
+                return state
+
+            # fallback: if user mentions a place name but resolver didn’t catch it, let RAG handle it
+            # (will improve this in Level 3 disambiguation)
+
+    # 3) If not handled by SQL/hybrid, route to RAG
     state.route = "rag"
     state.rag_query = q
     return state
