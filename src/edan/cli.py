@@ -50,7 +50,7 @@ def main() -> None:
             delimiter=args.delimiter,
             engine=args.engine,
         )
-        print(f"[OK] Loaded DB: {args.db} (engine: {args.engine}, table: {args.table})")
+        print(f"[OK] Loaded DB: {args.db} (engine: {args.engine}, table: {args.table}, RAG index built)")
     elif args.cmd == "ask":
         if looks_malicious(args.q):
             print("Refused: unsafe request (destructive or exfiltration attempt).")

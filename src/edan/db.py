@@ -7,6 +7,7 @@ from typing import Literal
 
 from .normalize import parse_int, parse_percent, clean_text
 from edan.sql.views import create_views
+from edan.rag.index import build_rag_index
 
 
 def load_csv_to_sqlite(
@@ -154,6 +155,10 @@ def load_csv_to_duckdb(
     
     # Create views
     create_views(conn, table=table)
+    
+    # Build FTS index
+    build_rag_index(db_path)
+    
     conn.close()
 
 
