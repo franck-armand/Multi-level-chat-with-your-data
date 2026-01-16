@@ -211,7 +211,7 @@ Level 3 makes the assistant behave like a real agent:
     3) Winners by party (counts)
 
 **Session memory (bonus)**
-- Show turnout in Abidjan. → choose option `1`
+- Show turnout in Abidjan. → choose option
 - Show turnout in Abidjan. again
   - Expected: uses remembered choice (no repeated clarification)
 
