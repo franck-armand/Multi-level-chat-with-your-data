@@ -1,10 +1,12 @@
 from __future__ import annotations
+from pathlib import Path
 
 from langgraph.graph import StateGraph, END
 
 from edan.level2.state import L2State
 from edan.level2.nodes import node_resolve, node_route, node_sql, node_rag, node_compose
-
+from edan.obs.trace import new_trace
+from edan.obs.sinks import JsonlTraceSink
 
 def build_graph():
     g = StateGraph(L2State)
@@ -42,7 +44,20 @@ def build_graph():
 _GRAPH = build_graph()
 
 
-def run_level2(user_query: str, db_path: str) -> L2State:
-    state = L2State(user_query=user_query, db_path=db_path)
+def run_level2(user_query: str, db_path: str, trace_out: str | None = "logs/traces.jsonl") -> L2State:
+    trace = new_trace({"level": 2, "query": user_query, "db": db_path})
+
+    state = L2State(user_query=user_query, db_path=db_path, trace=trace)
     final_dict = _GRAPH.invoke(state)
-    return L2State(**final_dict)
+
+    final_state = L2State(**final_dict)
+
+    if final_state.trace is None:
+        final_state.trace = trace
+
+    final_state.trace.finish()
+
+    if trace_out:
+        JsonlTraceSink(Path(trace_out)).write(final_state.trace)
+
+    return final_state

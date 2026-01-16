@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from edan.entities.resolve import Resolved
+from edan.obs.trace import Trace
 
 
 @dataclass
@@ -19,25 +20,25 @@ class Citation:
 
 @dataclass
 class L2State:
-    # input
     user_query: str
     db_path: str
 
-    # resolved entities
-    resolved: Optional[Resolved] = None
-
-    # router decision
-    route: Optional[str] = None  # "sql" | "rag" | "hybrid"
+    # Resolved entities / router
+    resolved: Any | None = None
+    route: str | None = None  # "sql" | "rag" | "hybrid" | "blocked"
 
     # SQL path
-    sql: Optional[str] = None
-    sql_used: Optional[str] = None
-    sql_rows: Optional[List[Dict[str, Any]]] = None
+    sql: str | None = None
+    sql_used: str | None = None
+    sql_rows: List[Dict[str, Any]] | None = None
 
     # RAG path
-    rag_query: Optional[str] = None
+    rag_query: str | None = None
     rag_hits: List[Citation] = field(default_factory=list)
 
-    # output
-    answer: Optional[str] = None
+    # Output
+    answer: str | None = None
     warnings: List[str] = field(default_factory=list)
+
+    # Tracing
+    trace: Trace | None = None

@@ -5,6 +5,7 @@ from edan.entities.normalize import normalize_for_match
 from pathlib import Path
 from typing import Any, Dict, List
 
+from edan.obs.trace import trace_event
 from edan.entities.vocab import load_vocab
 from edan.entities.resolve import resolve_entities
 from edan.level2.state import L2State, Citation
@@ -20,8 +21,13 @@ from edan.level2.answer import (
 
 
 def node_resolve(state: L2State) -> L2State:
-    vocab = load_vocab(Path(state.db_path))
-    state.resolved = resolve_entities(state.user_query, vocab)
+    if state.trace:
+        with trace_event(state.trace, "entity.resolve", {"query": state.user_query}):
+            vocab = load_vocab(Path(state.db_path))
+            state.resolved = resolve_entities(state.user_query, vocab)
+    else:
+        vocab = load_vocab(Path(state.db_path))
+        state.resolved = resolve_entities(state.user_query, vocab)
     return state
 
 
@@ -38,6 +44,16 @@ def node_route(state: L2State) -> L2State:
             "Ask an analytics question about the dataset instead."
         )
         return state
+    
+    # Log routing decision
+    if state.trace:
+        with trace_event(state.trace, "route.decision", {
+            "route": state.route,
+            "sql_present": bool(state.sql),
+            "rag_query_present": bool(state.rag_query),
+            "resolved": getattr(state.resolved, "__dict__", None),
+        }):
+            pass
     
     # If user just asks a party name, treat it as a valid query (hybrid)
     if state.resolved and state.resolved.party and len(normalize_for_match(q).split()) <= 3:
@@ -235,7 +251,7 @@ def node_route(state: L2State) -> L2State:
 
 def node_sql(state: L2State) -> L2State:
     assert state.sql is not None
-    df, final_sql = run_query(Path(state.db_path), state.sql, limit=200)
+    df, final_sql = run_query(Path(state.db_path), state.sql, limit=200, trace=state.trace)
     state.sql_used = final_sql
     state.sql_rows = df.to_dict(orient="records")
     return state
@@ -244,7 +260,20 @@ def node_sql(state: L2State) -> L2State:
 def node_rag(state: L2State) -> L2State:
     query = state.rag_query or state.user_query
 
-    hits = retrieve(Path(state.db_path), query, k=5)
+    if state.trace:
+        with trace_event(state.trace, "rag.retrieve", {"query": query, "k": 5}):
+            hits = retrieve(Path(state.db_path), query, k=5)
+    else:
+        hits = retrieve(Path(state.db_path), query, k=5)
+
+    # Relevance threshold (you already added)
+    if not hits or hits[0].score < 2.0:
+        state.rag_hits = []
+        if state.trace:
+            with trace_event(state.trace, "rag.hits", {"hits": [], "threshold": 2.0}):
+                pass
+        return state
+
     state.rag_hits = [
         Citation(
             chunk_id=h.chunk_id,
@@ -257,8 +286,15 @@ def node_rag(state: L2State) -> L2State:
         )
         for h in hits
     ]
-    if not hits or hits[0].score < 2.0:   # tune threshold after observing typical values
-        state.rag_hits = []
+
+    if state.trace:
+        with trace_event(
+            state.trace,
+            "rag.hits",
+            {"hits": [{"chunk_id": h.chunk_id, "score": h.score, "code": h.circonscription_code} for h in hits]},
+        ):
+            pass
+
     return state
 
 

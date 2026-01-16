@@ -46,7 +46,10 @@ def run_level2(db_path: str, max_rows: int):
                 st.code(state.sql_used, language="sql")
             if state.rag_hits:
                 st.write("rag_hits:", [h.__dict__ for h in state.rag_hits])
-
+        
+        # with st.expander("Trace", expanded=False):
+        #     st.json(state.trace.to_dict() if state.trace else {})
+        
         st.session_state.messages.append({
             "role": "assistant",
             "content": state.answer or "",
