@@ -16,7 +16,11 @@ def sidebar_controls():
 
     mode = st.sidebar.selectbox(
         "Mode",
-        ["Level 1 (SQL)", "Level 2 (Hybrid SQL+RAG)"],
+        [
+        "Level 1 (SQL)",
+        "Level 2 (Hybrid SQL+RAG)",
+        "Level 3 (Agentic: clarify/disambiguate)"
+        ],
         index=0
     )
 

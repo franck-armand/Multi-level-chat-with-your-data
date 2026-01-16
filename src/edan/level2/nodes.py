@@ -38,7 +38,20 @@ def node_route(state: L2State) -> L2State:
             "Ask an analytics question about the dataset instead."
         )
         return state
-
+    
+    # If user just asks a party name, treat it as a valid query (hybrid)
+    if state.resolved and state.resolved.party and len(normalize_for_match(q).split()) <= 3:
+        party = state.resolved.party.replace("'", "''")
+        state.route = "sql"
+        state.sql = f"""
+        SELECT
+            '{party}' AS party,
+            (SELECT COUNT(*) FROM vw_winners WHERE party = '{party}') AS winners,
+            (SELECT SUM(score) FROM vw_results_clean WHERE party = '{party}') AS total_votes
+        ;
+        """
+        return state
+    
     # 1) If Level 1 planner can handle it, prefer that SQL (charts/rankings already implemented there)
     plan = plan_question(q)
     if plan is not None:

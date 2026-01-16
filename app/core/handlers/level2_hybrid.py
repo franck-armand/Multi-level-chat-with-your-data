@@ -19,7 +19,7 @@ def run_level2(db_path: str, max_rows: int):
 
     with st.chat_message("assistant"):
         thinking = st.empty()
-        thinking.markdown("…")
+        thinking.markdown("...")
 
         state = run_level2_graph(prompt, db_path)
 

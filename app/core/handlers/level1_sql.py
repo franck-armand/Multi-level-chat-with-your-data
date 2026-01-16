@@ -22,7 +22,7 @@ def run_level1(db_path: str, max_rows: int):
 
     with st.chat_message("assistant"):
         thinking = st.empty()
-        thinking.markdown("Thinking…")
+        thinking.markdown("...")
 
         if looks_malicious(prompt):
             thinking.empty()
