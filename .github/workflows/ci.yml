@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Sync deps
+        run: uv sync --extra dev
+
+      - name: Run unit tests
+        run: uv run pytest -q
+
+      - name: Build dataset + DB + RAG index
+        run: |
+          uv run edan extract --docx data/raw/EDAN_2025_RESULTAT_NATIONAL_DETAILS.docx --out data/edan_results.csv
+          uv run edan validate --csv data/edan_results.csv
+          uv run edan load-db --engine duckdb --csv data/edan_results.csv --db data/edan.duckdb --table election_results
+          uv run python -c "from pathlib import Path; from edan.rag.index import build_rag_index; build_rag_index(Path('data/edan.duckdb'))"
+
+      - name: Run smoke eval
+        env:
+          EDAN_LLM_MODE: local
+        run: uv run edan eval --db data/edan.duckdb --suite eval/suites/smoke.json --out reports
