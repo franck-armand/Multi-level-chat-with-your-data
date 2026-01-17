@@ -30,6 +30,7 @@ def retrieve(
     DuckDB creates a macro like:
       fts_main_<table>.match_bm25(input_id, query_string, ...)
     """
+    duckdb.connect().execute("INSTALL fts;")
     con = duckdb.connect(str(db_path), read_only=True)
     try:
         con.execute("LOAD fts;")

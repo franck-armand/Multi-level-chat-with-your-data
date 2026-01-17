@@ -14,6 +14,11 @@ ALLOWED_RELATIONS = {
 }
 
 def run_query(db_path: Path, sql: str, limit: int = 200, trace: Trace | None = None):
+    # We connect to an in-memory db just to install the extension to the host machine
+    temp_con = duckdb.connect()
+    temp_con.execute("INSTALL fts; LOAD fts;")
+    temp_con.close()
+    
     # Validate
     if trace:
         with trace_event(trace, "sql.validate", {"sql": sql[:500]}):
