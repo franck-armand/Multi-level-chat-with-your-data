@@ -2,29 +2,56 @@ from __future__ import annotations
 
 from pathlib import Path
 import streamlit as st
-import pandas as pd
 
 from ui.chat import init_chat_state, render_history
 from edan.level3.graph import run_level3
 from edan.level3.disambiguate import run_sql_for_choice, apply_choice_and_update_memory, memory_key_from_query
 from edan.sql.exec import run_query
-
+from edan.obs.trace import new_trace, trace_event
+from edan.obs.sinks import JsonlTraceSink
 
 def _execute_choice(db_path: str, max_rows: int, pending: dict, choice_obj):
-    # remember
-    st.session_state.l3_memory = apply_choice_and_update_memory(
-        pending["user_query"], choice_obj, st.session_state.l3_memory
-    )
+    trace = new_trace({
+        "level": 3,
+        "phase": "selection",
+        "db": db_path,
+        "original_query": pending.get("user_query"),
+    })
 
-    sql, narrative = run_sql_for_choice(Path(db_path), choice_obj.payload)
+    # Trace: selection
+    with trace_event(trace, "l3.selection", {
+        "choice_key": getattr(choice_obj, "key", None),
+        "label": getattr(choice_obj, "label", None),
+        "payload": getattr(choice_obj, "payload", None),
+    }):
+        pass
+
+    # Remember selection (session memory)
+    with trace_event(trace, "l3.memory.write", {}):
+        st.session_state.l3_memory = apply_choice_and_update_memory(
+            pending["user_query"], choice_obj, st.session_state.l3_memory
+        )
+
+    # Build SQL from the selected payload
+    with trace_event(trace, "l3.choice.to_sql", {"mode": choice_obj.payload.get("mode")}):
+        sql, narrative = run_sql_for_choice(Path(db_path), choice_obj.payload)
 
     msg = {"role": "assistant", "content": narrative}
+
+    # Execute SQL (this will trace validate/execute/result via run_query(trace=...))
     if sql and sql.strip():
-        df, final_sql = run_query(Path(db_path), sql, limit=max_rows)
+        df, final_sql = run_query(Path(db_path), sql, limit=max_rows, trace=trace)
         msg["sql"] = final_sql
         msg["df"] = df.head(50)
 
+    # Finish + write trace to JSONL
+    trace.finish()
+    JsonlTraceSink(Path("logs/traces.jsonl")).write(trace)
+
+    # Write message to chat history
     st.session_state.messages.append(msg)
+
+    # Clear pending
     st.session_state.l3_pending = None
 
 

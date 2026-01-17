@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from edan.obs.trace import Trace
 
 
 @dataclass
@@ -26,3 +27,6 @@ class L3State:
 
     # final answer (plain text)
     answer: Optional[str] = None
+    
+    # tracing info
+    trace: Trace | None = None
