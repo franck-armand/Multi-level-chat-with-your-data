@@ -231,6 +231,77 @@ Level 3 makes the assistant behave like a real agent:
 
 ---
 
+<details>
+<summary><b>Level 4 - Advanced (observability + evaluation + reliability)</b></summary>
+
+Level 4 adds production-grade tooling for **observability** and **offline evaluation** to measure, debug, and prevent regressions.
+
+### Level 4 features
+
+#### Observability (end-to-end tracing)
+Each request is traced end-to-end and written as **JSONL** (one trace per line):
+- **intent / routing**
+  - SQL vs RAG vs CLARIFY vs BLOCKED
+  - entity resolution output
+- **retrieval results (RAG)**
+  - query used, `k`, top hits (`chunk_id`, `score`, `code`)
+  - retrieval timing
+- **SQL execution**
+  - generated SQL
+  - validation outcome (safe SQL)
+  - execution timing + row/col counts
+- **Level 3 selections**
+  - ambiguity detection event
+  - choices proposed
+  - selected option
+  - SQL generated/executed for the selection
+  - memory write event (session memory key)
+- **latency**
+  - total time + per-step timings
+
+Trace output locations:
+- interactive runs: `logs/traces.jsonl` (optional)
+- eval runs: `reports/traces.jsonl`
+
+#### Offline evaluation suite
+Implements an **offline eval runner** with:
+- metrics summary (`reports/level4_summary.json`)
+- list of failures (`reports/level4_failures.jsonl`)
+- debug traces (`reports/traces.jsonl`)
+
+Eval coverage:
+1) **Fact lookup accuracy**
+   - RAG: must return citations and citations must contain expected entities
+2) **Aggregation correctness**
+   - uses DB as an **oracle** (`oracle_sql`) and compares assistant result vs oracle result (exact / tolerance)
+3) **Citation faithfulness**
+   - answer must be supported by cited evidence (checked via excerpt matching)
+4) **Safety**
+   - adversarial prompts must be refused
+
+#### Regression testing in CI (recommended bonus)
+A smoke suite (`eval/suites/smoke.json`) is run in CI to prevent regressions:
+- builds DB + RAG index
+- runs `edan eval` on the smoke suite
+- CI fails if any test fails
+
+### Level 4 limitations
+- Citation faithfulness checks are currently heuristic (string checks against cited excerpts). This is robust enough for offline eval, and can be strengthened later (claim extraction, stricter entailment checks).
+- Token usage is not guaranteed across all OpenAI-compatible providers. Latency and tool events are always logged; token usage may be provider-dependent.
+
+<details>
+<summary><b>Level 4 - Commands</b></summary>
+
+**Run offline evaluation (oracle-based suite)**
+```bash
+edan eval --db data/edan.duckdb --suite eval/suites/level4_oracle.json --out reports
+```
+</details>
+
+</details>
+
+---
+
 ### 1. Setup (uv)
 
 ```bash
