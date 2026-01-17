@@ -8,6 +8,7 @@ from .validate import run_validations
 from .db import load_csv_to_db
 from .agent.agent import plan_question, looks_malicious
 from .sql.exec import run_query
+from edan.eval.runner import run_eval
 
 def main() -> None:
     p = argparse.ArgumentParser(prog="edan", description="EDAN 2025 extraction + validation + DB utilities")
@@ -33,6 +34,11 @@ def main() -> None:
     p_ask.add_argument("--db", required=True, type=Path, help="DuckDB path")
     p_ask.add_argument("--q", required=True, help="User question")
     p_ask.add_argument("--limit", type=int, default=200, help="Max rows to return")
+    
+    p_eval = sub.add_parser("eval", help="Run offline Level 4 evaluation suite")
+    p_eval.add_argument("--db", required=True, type=Path, help="DuckDB path")
+    p_eval.add_argument("--suite", required=True, type=Path, help="Eval suite json (eval/suites/level4.json)")
+    p_eval.add_argument("--out", default=Path("reports"), type=Path, help="Output dir")
 
     args = p.parse_args()
 
@@ -71,5 +77,5 @@ def main() -> None:
         print("\nResult preview:")
         print(df.head(20).to_string(index=False))
         print("*" * 30)
-
- 
+    elif args.cmd == "eval":
+        run_eval(args.db, args.suite, args.out)
