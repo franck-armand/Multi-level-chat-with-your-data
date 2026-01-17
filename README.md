@@ -337,7 +337,7 @@ edan validate --csv data/edan_results.csv
 ```
 This runs a set of validations to make sure the source data is actually true.
 
-### 4. Load into DuckDB (Level 1 readiness)
+### 4. Load data into DuckDB
 
 ```bash
 edan load-db --engine duckdb --csv data/edan_results.csv --db data/edan.duckdb --table election_results
@@ -348,7 +348,7 @@ edan load-db --engine duckdb --csv data/edan_results.csv --db data/edan.duckdb -
 
 ### 5. Streamlit app (chat UI)
 
-```python
+```bash
 streamlit run app/streamlit_app.py
 ```
 
