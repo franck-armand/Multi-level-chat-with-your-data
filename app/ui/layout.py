@@ -7,9 +7,9 @@ from edan.llm.config import get_llm_config
 DEFAULT_DB = Path("data/edan.duckdb")
 
 def setup_page():
-    st.set_page_config(page_title="EDAN Chat", page_icon="", layout="wide")
-    st.title("EDAN Chat")
-    st.caption("Dataset-only answers (Level 1 SQL) + Hybrid RAG (Level 2).")
+    st.set_page_config(page_title="Chat with your data (EDAN 2025)", page_icon="🗳️", layout="wide")
+    st.title("Chat with your data")
+    st.caption("Ask questions about the EDAN 2025 election results dataset.")
 
 def sidebar_controls():
     st.sidebar.header("Settings")
