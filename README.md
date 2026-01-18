@@ -1,4 +1,4 @@
-# EDAN 2025
+# Chat with your data
 
 A reproducible project to ingest an official CEI elections results PDF and (next) build a “chat with your data” experience on top of it.
 
@@ -143,7 +143,6 @@ uv run src/edan/rag/manual_test.py
 - P.D.C.I R.D.A seats
 - agneby tiassa winners
 - Bouake ville winner
-- Hybrid (analytics with fuzzy entities)
 - How many seats did P.D.C.I win?
 - How many seats did FPI win?
 - Show the winner for code 181
