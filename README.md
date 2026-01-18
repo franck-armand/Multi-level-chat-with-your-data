@@ -173,6 +173,8 @@ uv run src/edan/rag/manual_test.py
 <details>
 <summary><b>Level 3 - Improved Agentic (clarification + disambiguation + multi-step)</b></summary>
 
+https://github.com/user-attachments/assets/4ff27749-525a-4b87-879e-fecb5389cab8
+
 Level 3 makes the assistant behave like a real agent:
 - it **detects ambiguity**
 - it **asks a clarifying question** (or presents disambiguation options)
