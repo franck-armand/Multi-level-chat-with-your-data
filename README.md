@@ -77,6 +77,8 @@ This level delivers:
 <details>
 <summary><b>Level 2 - Hybrid Router (SQL + RAG for fuzziness, narrative, grounding)</b></summary>
 
+https://github.com/user-attachments/assets/916ec2cb-32cd-456b-b8b3-abe7cce50171
+
 Level 2 improves robustness by adding a **hybrid router**:
 - **SQL path** for analytics (counts/rankings/charts) using DuckDB views + safe SQL
 - **RAG path** for fuzzy lookup + narrative answers + grounding with citations
