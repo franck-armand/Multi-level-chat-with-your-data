@@ -14,6 +14,8 @@ and header bleed. The DOCX keeps the table structure, allowing a perfect export.
 <details>
 <summary><b>Level 1 - Text-to-SQL Agent (Analytics-first) </b></summary>
 
+https://github.com/user-attachments/assets/8710fd50-f08c-43a9-a35e-a58545671ec0
+
 This level delivers:
 - deterministic ingestion (DOCX → CSV → validation → DuckDB)
 - curated semantic views (`vw_results_clean`, `vw_turnout`, `vw_winners`, `vw_party_seats`)
