@@ -1,6 +1,6 @@
 # Chat with your data
 
-A reproducible project to ingest an official CEI elections results PDF and (next) build a “chat with your data” experience on top of it.
+A reproducible project to ingest an official CEI elections results PDF: `EDAN : ELECTIONS DES DEPUTES A L’ASSEMBLEE NATIONALE` and build a “chat with your data” experience on top of it.
 
 **Source of truth**
 - `EDAN_2025_RESULTAT_NATIONAL_DETAILS.pdf` (official)
@@ -335,7 +335,7 @@ edan extract --docx /path/to/EDAN_2025_RESULTAT_NATIONAL_DETAILS.docx --out data
 
 The extractor writes `;`-delimited CSV to avoid ambiguity with commas in French numbers.
 
-### 3. Validate (must pass before submission)
+### 3. Validate EDAN data (Votes, counts ...)
 
 ```bash
 edan validate --csv data/edan_results.csv
