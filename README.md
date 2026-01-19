@@ -1,6 +1,6 @@
 # Chat with your data
 
-A reproducible project to ingest an official CEI elections results PDF: `EDAN : ELECTIONS DES DEPUTES A L’ASSEMBLEE NATIONALE` and build a “chat with your data” experience on top of it.
+A reproducible project to ingest an official CEI elections results PDF: `EDAN: ELECTIONS DES DEPUTES A L’ASSEMBLEE NATIONALE` and build a “chat with your data” experience on top of it.
 
 **Source of truth**
 - `EDAN_2025_RESULTAT_NATIONAL_DETAILS.pdf` (official)
@@ -142,7 +142,7 @@ uv run src/edan/rag/manual_test.py
 - Find OHOUNA N'TAKPE NICAISE.
 - What does the dataset say about AGNEBY-TIASSA?
 
-**Fuzziness / alias / casing**
+**Fuzziness/alias/casing**
 - R.H.D.P seats
 - P.D.C.I R.D.A seats
 - agneby tiassa winners
@@ -151,7 +151,7 @@ uv run src/edan/rag/manual_test.py
 - How many seats did FPI win?
 - Show the winner for code 181
 - Show turnout in code 060
-- What’s the total number of votants?
+- What’s the total number of voters?
 
 **Non-answer (out of dataset)**
 - What was the weather on election day?
@@ -186,20 +186,20 @@ Level 3 makes the assistant behave like a real agent:
   - Scope ambiguity (example: “Show turnout in Abidjan” can mean *regional summary* OR *per-circonscription list*)
   - Entity ambiguity (example: “Who won in Tiapoum?” may map to multiple circonscriptions/codes)
   - Metric ambiguity (example: “Top 5 in Grand-Bassam” requires clarification: top 5 *what?*)
-- **Clarification / disambiguation**
+- **Clarification/disambiguation**
   - Returns a clarification question + numbered options
   - User selects an option
   - Agent proceeds automatically based on the selection
 - **Multi-step execution**
   - Selection triggers the appropriate tool run (SQL) and returns the final answer
 - **Session memory (bonus)**
-  - Once the user selects an option (e.g. Abidjan → “region summary”), it is remembered for the session
+  - Once the user selects an option (e.g., Abidjan → “region summary”), it is remembered for the session
   - Subsequent questions reuse the stored choice (no repeated clarification)
 
 ### Level 3 limitations
 - Clarification is deterministic (rule-based). A future enhancement is to let the LLM rewrite clarifying questions more naturally while keeping strict guardrails.
 - Some entity mentions may not exist in the dataset (e.g., “Tiapum” if not present). In that case, the system returns “Not found in the provided PDF dataset.”
-- Improve UI, allow user to select another option for a previous question.
+- Improve UI, allow the user to select another option for a previous question.
 
 <details>
 <summary><b>Level 3 - Test Questions </b></summary>
@@ -245,7 +245,7 @@ Level 4 adds production-grade tooling for **observability** and **offline evalua
 
 #### Observability (end-to-end tracing)
 Each request is traced end-to-end and written as **JSONL** (one trace per line):
-- **intent / routing**
+- **intent/routing**
   - SQL vs RAG vs CLARIFY vs BLOCKED
   - entity resolution output
 - **retrieval results (RAG)**
@@ -276,7 +276,7 @@ Implements an **offline eval runner** with:
 
 Eval coverage:
 1) **Fact lookup accuracy**
-   - RAG: must return citations and citations must contain expected entities
+   - RAG: must return citations, and citations must contain expected entities
 2) **Aggregation correctness**
    - uses DB as an **oracle** (`oracle_sql`) and compares assistant result vs oracle result (exact / tolerance)
 3) **Citation faithfulness**
@@ -347,7 +347,7 @@ This runs a set of validations to make sure the source data is actually true.
 ```bash
 edan load-db --engine duckdb --csv data/edan_results.csv --db data/edan.duckdb --table election_results
 
-# If you prefer SQLite instead: (I implemented both for benchmark later on)
+# If you prefer SQLite instead: (I implemented both for benchmarking later on)
 # edan load-db --engine sqlite --csv data/edan_results.csv --db data/edan.sqlite --table election_results
 ```
 
@@ -360,7 +360,7 @@ After `edan load-db`, DuckDB contains one base table, curated views (semantic la
 **Grain:** one row = one candidate row enriched with circonscription turnout stats.
 
 **Columns**
-- Identity / geography:
+- Identity/geography:
   - `region` (TEXT)
   - `circonscription_code` (TEXT)
   - `circonscription_name` (TEXT)
@@ -436,6 +436,7 @@ An FTS index is built on `rag_chunks.chunk_text` (BM25), enabling fuzzy lookup a
 ```bash
 streamlit run app/streamlit_app.py
 ```
+---
 
 ### Reproducibility notes
 
@@ -443,7 +444,6 @@ streamlit run app/streamlit_app.py
 - CSV is semicolon-delimited.
 - Numeric normalization removes spaces and thousands separators, and converts comma decimals to dot decimals.
 
----
 
 ### Future work
 
@@ -497,7 +497,7 @@ Current ingestion uses DOCX for stable table extraction. To generalize:
 - Hard limits:
   - query timeouts
   - max rows returned
-  - safe defaults for chart binning / sampling
+  - safe defaults for chart binning/sampling
 - Observability expansion:
   - export traces in OpenTelemetry-compatible structures (optional)
   - route-level latency budgets and alerting thresholds
@@ -516,7 +516,7 @@ Current ingestion uses DOCX for stable table extraction. To generalize:
     - local deterministic by default
     - OpenAI-compatible provider (DeepSeek/OpenAI) via env vars
 - Continue strengthening CI regression:
-  - smoke eval suite + expanded eval suite with oracle SQL checks
+  - smoke eval suite + expanded eval suite with Oracle SQL checks
   - fail build on pass-rate drop, safety regression, or latency regression
 
 </details>
