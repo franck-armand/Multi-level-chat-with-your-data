@@ -351,6 +351,86 @@ edan load-db --engine duckdb --csv data/edan_results.csv --db data/edan.duckdb -
 # edan load-db --engine sqlite --csv data/edan_results.csv --db data/edan.sqlite --table election_results
 ```
 
+After `edan load-db`, DuckDB contains one base table, curated views (semantic layer), and the RAG index table.
+
+<details>
+<summary><b>EDAN DB details</b></summary>
+
+#### Base table: `election_results`
+**Grain:** one row = one candidate row enriched with circonscription turnout stats.
+
+**Columns**
+- Identity / geography:
+  - `region` (TEXT)
+  - `circonscription_code` (TEXT)
+  - `circonscription_name` (TEXT)
+- Turnout metrics (per circonscription):
+  - `nb_bv` (INT)
+  - `inscrits` (INT)
+  - `votants` (INT)
+  - `taux_participation` (DOUBLE)
+  - `bull_nuls` (INT)
+  - `suf_exprimes` (INT)
+  - `bull_blancs_nbr` (INT)
+  - `bull_blancs_percent` (DOUBLE)
+- Candidate results:
+  - `party` (TEXT)
+  - `candidate` (TEXT)
+  - `score` (INT)
+  - `score_percent` (DOUBLE)
+  - `elected` (BOOLEAN)
+
+#### Semantic views (created automatically)
+These views simplify queries and constrain SQL generation.
+
+- `vw_results_clean`  
+  Cleaned view over `election_results` (stable interface for the agent).
+
+- `vw_turnout`  
+  **Grain:** one row per circonscription  
+  Built by grouping `vw_results_clean` on `(region, circonscription_code, circonscription_name)` and taking `MAX(...)` for turnout fields.
+
+- `vw_winners`  
+  **Grain:** one row per winning candidate per circonscription  
+  Selection rule:
+  - if any `elected=true` exists for that circonscription → keep elected rows  
+  - else fallback to `MAX(score)` for that circonscription
+
+- `vw_party_seats`  
+  **Grain:** one row per party  
+  Counts seats from `vw_winners`:
+  - `party`, `seats`
+
+#### RAG index table: `rag_chunks`
+**Purpose:** retrieval-augmented generation (RAG) over “row-as-text chunks” using DuckDB FTS/BM25.
+
+**Grain:** one row = one candidate row chunk.
+
+**Columns**
+- `chunk_id` (INT, stable row_number)
+- `chunk_text` (TEXT) — flattened text representation used for retrieval
+- provenance fields copied from `vw_results_clean`:
+  - `region`, `circonscription_code`, `circonscription_name`
+  - `party`, `candidate`, `score`, `score_percent`, `elected`
+  - turnout fields (`inscrits`, `votants`, `suf_exprimes`, etc.)
+
+**FTS index**
+An FTS index is built on `rag_chunks.chunk_text` (BM25), enabling fuzzy lookup and citation provenance.
+
+#### Relationships (mental model)
+- `election_results` (candidate-grain) → `vw_turnout` (circonscription-grain)
+- `election_results` → `vw_winners` (winner candidates)
+- `vw_winners` → `vw_party_seats` (seat counts by party)
+- `rag_chunks` mirrors `vw_results_clean` at candidate-grain for retrieval/citations
+
+> Tip: You can inspect tables/views with:
+> ```sql
+> SHOW TABLES;
+> DESCRIBE election_results;
+> SELECT * FROM vw_party_seats;
+> ```
+</details>
+
 ### 5. Streamlit app (chat UI)
 
 ```bash
@@ -362,3 +442,84 @@ streamlit run app/streamlit_app.py
 - Deterministic parsing (no ML/OCR).
 - CSV is semicolon-delimited.
 - Numeric normalization removes spaces and thousands separators, and converts comma decimals to dot decimals.
+
+---
+
+### Future work
+
+This repo is implemented as a **progressive multi-level system** (Level 1 → 4) to demonstrate increasing robustness. In a production context, the next step would be to converge toward a **single unified assistant** (one router, one UI, one pipeline) with configurable capabilities.
+
+<details>
+<summary><b>Details of possible improvements</b></summary>
+
+### 1) Unify levels into one assistant (single router + shared tools)
+- Replace “Level mode” selection with one **global router** that always decides:
+  - **SQL analytics** (counts/rankings/totals/charts)
+  - **RAG grounding** (fuzzy lookup, narrative explanations, citations)
+  - **Clarification/disambiguation** when ambiguous
+- Keep a single shared tool layer:
+  - safe SQL validator/executor
+  - retriever(s)
+  - chart renderer
+  - shared entity resolution + session memory
+
+### 2) Stronger retrieval: add embeddings + hybrid search
+Current RAG uses **DuckDB FTS/BM25** on `rag_chunks` (fast + reproducible). To improve fuzziness and semantic matching:
+- Add an **embedding index** for `rag_chunks` (optional):
+  - hybrid retrieval: BM25 (keyword) + embeddings (semantic)
+  - cache embeddings by dataset hash
+- Use the same provenance metadata already present (`chunk_id`, code, party, candidate, excerpt) for citations.
+
+### 3) File-type agnostic ingestion (beyond DOCX)
+Current ingestion uses DOCX for stable table extraction. To generalize:
+- Introduce a generic ingestion interface:
+  - PDFs (table extraction + page provenance)
+  - CSV/Excel
+  - HTML
+  - plain text/Markdown
+- Produce one internal normalized schema + provenance:
+  - base table(s) for analytics
+  - chunk table for retrieval
+  - consistent metadata fields (`source_doc`, `source_page`, `table_id`, `row_id`)
+
+### 4) Better grounding & citations (SQL + RAG)
+- RAG: stronger faithfulness checks:
+  - ensure key claims appear in cited excerpts (already partially done in eval)
+  - optional claim extraction + stricter entailment checks
+- SQL: add “explainability”:
+  - cite contributing rows for aggregates (e.g., seats by party derived from `vw_winners`)
+  - attach view/table provenance in trace (“derived from vw_party_seats → vw_winners → vw_results_clean”)
+
+### 5) Reliability & performance
+- Cache with invalidation keyed by dataset version:
+  - retrieval cache: `(dataset_hash, query, k) → hits`
+  - SQL cache: `(dataset_hash, sql) → results`
+- Hard limits:
+  - query timeouts
+  - max rows returned
+  - safe defaults for chart binning / sampling
+- Observability expansion:
+  - export traces in OpenTelemetry-compatible structures (optional)
+  - route-level latency budgets and alerting thresholds
+
+### 6) Versioning (dataset/index)
+- Store a meta record:
+  - `docx_sha256`, `csv_sha256`, `duckdb_schema_version`, `rag_index_version`, `code_version`
+- Auto-rebuild index if hashes change:
+  - prevents stale indices and ensures reproducibility
+
+### 7) Product packaging
+- Provide a clean “integrate into your system” surface:
+  - a Python package API (already close)
+  - optional service mode (REST) if needed
+  - provider config for LLM enhancer:
+    - local deterministic by default
+    - OpenAI-compatible provider (DeepSeek/OpenAI) via env vars
+- Continue strengthening CI regression:
+  - smoke eval suite + expanded eval suite with oracle SQL checks
+  - fail build on pass-rate drop, safety regression, or latency regression
+
+</details>
+
+---
+
