@@ -9,6 +9,8 @@
 
 ChatWithDocs is a production-ready RAG (Retrieval-Augmented Generation) system that brings the power of AI to your documents. Whether you're analyzing research papers, reviewing contracts, or exploring datasets, simply upload your files and start a conversation.
 
+<img width="1521" height="991" alt="Image" src="https://github.com/user-attachments/assets/a6f0abca-6634-40e8-b26f-87253869b604" />
+
 ---
 
 ## Table of Contents
