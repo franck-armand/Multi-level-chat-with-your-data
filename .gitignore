@@ -220,3 +220,18 @@ __marimo__/
 
 logs/
 reports/
+
+# ChatWithDocs specific
+data/uploads/
+data/vectors/
+data/audit_logs/
+data/*.db
+data/*.duckdb
+
+# Temporary scripts
+commit_phases.sh
+fix_data.py
+
+# Demo/temp directories
+demo/
+.opencode/
