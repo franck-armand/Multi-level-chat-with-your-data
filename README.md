@@ -353,7 +353,7 @@ EOF
 │                   │ Hybrid Search│                          │
 │                   │ BM25 + Vector│                          │
 │                   └──────────────┘                          │
-│                         │                                  │
+│                         │                                   │
 │  ┌─────────────┐     ┌──┴───────────┐     ┌──────────────┐  │
 │  │  Document   │────▶│   Ingestion  │────▶│  ChromaDB    │  │
 │  │   Upload    │     │   Pipeline   │     │ Vector Store │  │
