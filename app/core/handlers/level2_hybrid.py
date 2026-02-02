@@ -2,7 +2,7 @@ from __future__ import annotations
 import streamlit as st
 
 from ui.chat import init_chat_state, render_history
-from edan.level2.graph import run_level2 as run_level2_graph
+from chatwithdocs.level2.graph import run_level2 as run_level2_graph
 
 
 def run_level2(db_path: str, max_rows: int):

@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import streamlit as st
 
-from edan.llm.config import get_llm_config
+from chatwithdocs.llm.config import get_llm_config
 
 DEFAULT_DB = Path("data/edan.duckdb")
 

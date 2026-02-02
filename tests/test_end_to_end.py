@@ -2,13 +2,18 @@ from pathlib import Path
 import csv
 import tempfile
 
-from edan.extract_docx import extract_docx_to_csv
-from edan.validate import run_validations
+from chatwithdocs.extract_docx import extract_docx_to_csv
+from chatwithdocs.validate import run_validations
 
 
 def test_end_to_end_extract_and_validate():
     # Optional test: drop the DOCX into tests/fixtures/ to enable.
-    docx = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "EDAN_2025_RESULTAT_NATIONAL_DETAILS.docx"
+    docx = (
+        Path(__file__).resolve().parents[1]
+        / "tests"
+        / "fixtures"
+        / "EDAN_2025_RESULTAT_NATIONAL_DETAILS.docx"
+    )
     if not docx.exists():
         return
 

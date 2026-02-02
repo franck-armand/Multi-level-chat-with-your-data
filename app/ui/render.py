@@ -2,7 +2,7 @@ from __future__ import annotations
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from edan.charts import make_chart_payload, ChartError
+from chatwithdocs.charts import make_chart_payload, ChartError
 
 def render_sql(sql: str):
     with st.expander("SQL used", expanded=False):

@@ -2,8 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 import streamlit as st
 
-from edan.agent.agent import plan_question, looks_malicious
-from edan.sql.exec import run_query
+from chatwithdocs.agent.agent import plan_question, looks_malicious
+from chatwithdocs.sql.exec import run_query
 
 from ui.chat import init_chat_state, render_history
 from ui.render import render_sql, render_table, render_chart_from_plan

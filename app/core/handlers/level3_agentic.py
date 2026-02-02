@@ -4,11 +4,11 @@ from pathlib import Path
 import streamlit as st
 
 from ui.chat import init_chat_state, render_history
-from edan.level3.graph import run_level3
-from edan.level3.disambiguate import run_sql_for_choice, apply_choice_and_update_memory, memory_key_from_query
-from edan.sql.exec import run_query
-from edan.obs.trace import new_trace, trace_event
-from edan.obs.sinks import JsonlTraceSink
+from chatwithdocs.level3.graph import run_level3
+from chatwithdocs.level3.disambiguate import run_sql_for_choice, apply_choice_and_update_memory, memory_key_from_query
+from chatwithdocs.sql.exec import run_query
+from chatwithdocs.obs.trace import new_trace, trace_event
+from chatwithdocs.obs.sinks import JsonlTraceSink
 
 def _execute_choice(db_path: str, max_rows: int, pending: dict, choice_obj):
     trace = new_trace({
