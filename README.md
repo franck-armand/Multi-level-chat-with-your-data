@@ -56,25 +56,290 @@ ChatWithDocs is a production-ready RAG (Retrieval-Augmented Generation) system t
 
 ### Option 1: Docker (Recommended for Production)
 
+#### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+
+#### Quick Start with Ollama (Local LLM)
+
+For free, privacy-focused AI running entirely on your machine:
+
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd chatwithdocs
+git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
+cd Multi-level-chat-with-your-data
 
-# Start all services
+# Start with Ollama profile (includes local LLM)
+docker-compose --profile ollama up -d
+
+# Wait for Ollama to download the model (first run, ~2GB)
+docker-compose logs -f ollama
+
+# Access the web interface
+open http://localhost:8501  # macOS
+# Or visit: http://localhost:8501
+```
+
+**Note:** If you see `port is already allocated` on port 11434, Ollama is already running on your host machine. You can either:
+1. Stop host Ollama: `pkill ollama`, then re-run the docker-compose command
+2. Use the Docker Ollama alongside your host Ollama (see Configuration section)
+
+#### Quick Start with API Keys (Cloud AI)
+
+For users with OpenAI, DeepSeek, or Kimi API keys:
+
+```bash
+# Clone the repository
+git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
+cd Multi-level-chat-with-your-data
+
+# Create .env file with your API key
+cat > .env << 'EOF'
+# OpenAI
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+# Or DeepSeek (use OPENAI_API_KEY variable)
+# OPENAI_API_KEY=your-deepseek-key
+# OPENAI_BASE_URL=https://api.deepseek.com/v1
+# OPENAI_MODEL=deepseek-chat
+
+# Or Kimi
+# KIMI_API_KEY=your-kimi-key
+# LLM_PROVIDER=kimi
+# KIMI_MODEL=kimi-k2.5
+EOF
+
+# Start without Ollama profile
 docker-compose up -d
 
 # Access the web interface
 open http://localhost:8501
 ```
 
+#### Configuration Options
+
+**Using Local Ollama (host machine, not Docker)**
+
+If you already have Ollama installed on your computer:
+
+```bash
+# Create .env file
+cat > .env << 'EOF'
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+EOF
+
+# Start without Ollama service
+docker-compose up -d
+```
+
+**Using Docker Ollama**
+
+For Docker-managed Ollama with automatic model downloads:
+
+```bash
+# Add to .env file
+cat > .env << 'EOF'
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2
+OLLAMA_BASE_URL=http://ollama:11434
+EOF
+
+# Start with Ollama profile
+docker-compose --profile ollama up -d
+```
+
+**Environment Variables Reference**
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `LLM_PROVIDER` | AI provider: `ollama`, `openai`, `kimi` | `ollama` |
+| `OPENAI_API_KEY` | API key for OpenAI or DeepSeek | `sk-...` |
+| `OPENAI_MODEL` | OpenAI model name | `gpt-4o-mini` |
+| `OPENAI_BASE_URL` | Custom API base URL (for DeepSeek) | `https://api.deepseek.com/v1` |
+| `KIMI_API_KEY` | API key for Kimi | - |
+| `KIMI_MODEL` | Kimi model name | `kimi-k2.5` |
+| `OLLAMA_MODEL` | Ollama model to use | `llama3.2` |
+| `OLLAMA_BASE_URL` | Ollama server URL | `http://ollama:11434` |
+
+#### Troubleshooting
+
+**Port 11434 already in use (Ollama conflict)**
+
+```bash
+# Check if Ollama is running on your host machine
+curl http://localhost:11434/api/tags
+
+# Option 1: Stop host Ollama and use Docker Ollama
+pkill ollama
+docker-compose --profile ollama up -d
+
+# Option 2: Keep host Ollama, use it from Docker
+# Update .env: OLLAMA_BASE_URL=http://host.docker.internal:11434
+docker-compose up -d
+
+# Option 3: Use a different port for Docker Ollama
+# In docker-compose.yml, change: 11435:11434
+docker-compose --profile ollama up -d
+```
+
+**Windows-Specific Tips**
+
+```powershell
+# Use host.docker.internal for local Ollama on Windows
+cat > .env << 'EOF'
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+EOF
+
+# PowerShell alternative for host networking
+# Start Ollama on your host machine first: ollama serve
+# Then use the .env configuration above
+docker-compose up -d
+```
+
+**Memory Requirements for Ollama**
+
+| Model | RAM Required | GPU (Optional) |
+|-------|--------------|----------------|
+| `llama3.2` | 4GB | 2GB VRAM |
+| `mistral` | 8GB | 4GB VRAM |
+| `qwen2.5` | 8GB | 4GB VRAM |
+
+```bash
+# If Ollama is slow or crashes, try a smaller model
+# Edit .env: OLLAMA_MODEL=llama3.2
+# Or pull a smaller model in the container:
+docker exec -it chatwithdocs-ollama-1 ollama pull llama3.2:1b
+```
+
+**Stopping and Restarting Containers**
+
+```bash
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (WARNING: deletes all data)
+docker-compose down -v
+
+# Restart with fresh state
+docker-compose down -v
+docker-compose --profile ollama up -d
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f app
+```
+
+**Container Won't Start**
+
+```bash
+# Check for errors
+docker-compose logs app
+
+# Common issues:
+# 1. Port 8501 already in use
+lsof -i :8501  # Find process using port
+# Then either stop it or use different port in docker-compose.yml
+
+# 2. Permission denied on data directory (Linux/Mac)
+sudo chown -R $USER:$USER data/
+
+# 3. Model download failed
+# Re-pull the model:
+docker exec -it chatwithdocs-ollama-1 ollama pull llama3.2
+```
+
+#### Production Deployment
+
+**Persistent Volumes**
+
+Data is stored in Docker volumes that persist across restarts:
+
+```bash
+# View volumes
+docker volume ls
+# - chatwithdocs_data
+# - chatwithdocs_chromadb
+
+# Backup data
+docker run --rm -v chatwithdocs_data:/data -v $(pwd):/backup alpine tar czf /backup/data-backup.tar.gz -C /data .
+
+# Restore data
+docker run --rm -v chatwithdocs_data:/data -v $(pwd):/backup alpine tar xzf /backup/data-backup.tar.gz -C /data
+```
+
+**Production Environment Variables**
+
+Create a `production.env` file:
+
+```bash
+cat > production.env << 'EOF'
+# AI Provider (choose one)
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-production-key
+OPENAI_MODEL=gpt-4o
+
+# Security (change these!)
+SECRET_KEY=$(openssl rand -hex 32)
+ENABLE_AUTH=true
+
+# Storage paths (Docker internal paths)
+DATA_DIR=/app/data
+VECTOR_STORE_DIR=/app/data/vectors
+CHAT_HISTORY_DB=/app/data/chat_history.db
+EOF
+```
+
+**Health Checks**
+
+```bash
+# Check if services are healthy
+docker-compose ps
+
+# Health check endpoints
+curl http://localhost:8501  # Streamlit UI
+curl http://localhost:8000/api/health  # API (if running)
+
+# Check Ollama health
+curl http://localhost:11434/api/tags  # If exposed
+```
+
+**Docker Compose for Production**
+
+```bash
+# Use production environment
+docker-compose --env-file production.env -f docker-compose.yml up -d
+
+# With Ollama (if using local AI)
+docker-compose --env-file production.env -f docker-compose.yml --profile ollama up -d
+
+# Update without downtime
+docker-compose pull
+docker-compose up -d
+```
+
 ### Option 2: Local Installation (Development)
 
 ```bash
 # Clone and install
-git clone <repository-url>
-cd chatwithdocs
+git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
+cd Multi-level-chat-with-your-data
+
+# Install dependencies
 uv sync
+
+# For development (includes pytest, ruff)
+uv sync --extra dev
+
+# Note: `uv sync` installs runtime dependencies only (enough to run the app).
+# `uv sync --extra dev` includes development dependencies needed for tests and linting.
+# uv run pytest tests/ -q
 
 # Configure AI provider
 export LLM_PROVIDER=ollama
@@ -111,8 +376,8 @@ chatwithdocs server --api
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url>
-cd chatwithdocs
+git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
+cd Multi-level-chat-with-your-data
 
 # 2. Install dependencies
 uv sync
