@@ -1,4 +1,4 @@
-"""FastAPI server for Edan-V2 RAG system API.
+"""FastAPI server for ChatWithDocs RAG system API.
 
 Provides REST API endpoints for:
 - Chat with documents
