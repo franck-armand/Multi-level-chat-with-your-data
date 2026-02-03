@@ -117,7 +117,7 @@ st.markdown(
         border-radius: 0 0.25rem 0.25rem 0;
     }
     
-    /* Chat messages */
+    /* Chat messages - use theme-aware colors */
     .chat-message {
         padding: 1rem;
         border-radius: 0.5rem;
@@ -125,51 +125,51 @@ st.markdown(
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .user-message {
-        background-color: rgba(28, 131, 225, 0.1);
-        border-left: 3px solid #1C83E1;
+        background-color: rgba(255, 75, 75, 0.15);
+        border-left: 3px solid #FF4B4B;
     }
     .assistant-message {
-        background-color: rgba(49, 51, 63, 0.05);
+        background-color: rgba(128, 128, 128, 0.15);
         border-left: 3px solid #00C853;
     }
-    
-    /* File cards */
+
+    /* File cards - theme aware */
     .file-card {
-        background-color: rgba(49, 51, 63, 0.05);
-        border: 1px solid rgba(49, 51, 63, 0.2);
+        background-color: rgba(128, 128, 128, 0.15);
+        border: 1px solid rgba(128, 128, 128, 0.3);
         border-radius: 0.5rem;
         padding: 0.75rem;
         margin: 0.5rem 0;
     }
-    
-    /* Warning banner */
+
+    /* Warning banner - theme aware */
     .warning-banner {
-        background-color: #FFF3E0;
+        background-color: rgba(255, 152, 0, 0.2);
         border-left: 4px solid #FF9800;
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0 0.25rem 0.25rem 0;
     }
-    
-    /* Success banner */
+
+    /* Success banner - theme aware */
     .success-banner {
-        background-color: #E8F5E9;
+        background-color: rgba(76, 175, 80, 0.2);
         border-left: 4px solid #4CAF50;
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0 0.25rem 0.25rem 0;
     }
-    
-    /* Info box */
+
+    /* Info box - theme aware */
     .info-box {
-        background-color: rgba(28, 131, 225, 0.1);
+        background-color: rgba(28, 131, 225, 0.2);
         border-left: 4px solid #1C83E1;
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0 0.25rem 0.25rem 0;
     }
-    
-    /* LLM status badge */
+
+    /* LLM status badge - theme aware */
     .llm-status {
         display: inline-block;
         padding: 0.25rem 0.75rem;
@@ -178,12 +178,16 @@ st.markdown(
         font-weight: 600;
     }
     .llm-active {
-        background-color: #E8F5E9;
-        color: #2E7D32;
+        background-color: rgba(76, 175, 80, 0.3);
+        color: inherit;
     }
     .llm-inactive {
-        background-color: #FFEBEE;
-        color: #C62828;
+        background-color: rgba(244, 67, 54, 0.3);
+        color: inherit;
+    }
+    /* Theme-aware text color for secondary text */
+    .text-secondary {
+        color: rgba(128, 128, 128, 0.8);
     }
 </style>
 """,
@@ -194,25 +198,25 @@ st.markdown(
 # Sidebar
 with st.sidebar:
     # Title section
-    st.markdown('<div class="main-header">📚 ChatWithDocs</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">ChatWithDocs</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="subheader">Chat with your documents using AI</div>',
         unsafe_allow_html=True,
     )
 
     # LLM Status Section - Show Current Configuration
-    st.subheader("⚙️ AI Model Status")
+    st.subheader("AI Model Status")
 
     # Display current active configuration
     if llm_available:
         st.markdown(
-            f'<span class="llm-status llm-active">✅ {provider_name} Active</span>',
+            f'<span class="llm-status llm-active">[ACTIVE] {provider_name} Active</span>',
             unsafe_allow_html=True,
         )
         st.caption(f"Model: {current_model}")
     else:
         st.markdown(
-            '<span class="llm-status llm-inactive">⚠️ Not Connected</span>',
+            '<span class="llm-status llm-inactive">[!] Not Connected</span>',
             unsafe_allow_html=True,
         )
         if connection_error:
@@ -222,7 +226,7 @@ with st.sidebar:
 
     # Always show configure option
     st.session_state.show_llm_setup = st.checkbox(
-        "🔧 Configure / Switch AI Model",
+        "Configure / Switch AI Model",
         value=st.session_state.show_llm_setup,
     )
 
@@ -230,7 +234,7 @@ with st.sidebar:
 
     # LLM Configuration Wizard
     if st.session_state.show_llm_setup:
-        st.subheader("🧙 AI Configuration")
+        st.subheader("AI Configuration")
 
         # Show current config summary
         st.info(f"**Currently Active:** {provider_name} with {current_model}")
@@ -242,7 +246,7 @@ with st.sidebar:
         )
 
         if provider == "Kimi (Moonshot AI)":
-            st.info("💡 Kimi K2.5 is a capable Chinese LLM. Get API key at platform.moonshot.cn")
+            st.info("Tip: Kimi K2.5 is a capable Chinese LLM. Get API key at platform.moonshot.cn")
 
             col1, col2 = st.columns(2)
             with col1:
@@ -263,26 +267,26 @@ with st.sidebar:
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🧪 Test Connection", key="test_kimi"):
+                if st.button("Test Connection", key="test_kimi"):
                     with st.spinner("Testing..."):
                         success, msg = config_manager.test_connection(
                             "kimi", api_key=api_key, model=model
                         )
                         if success:
-                            st.success(f"✅ {msg}")
+                            st.success(f"[OK] {msg}")
                         else:
-                            st.error(f"❌ {msg}")
+                            st.error(f"[X] {msg}")
             with col2:
-                if api_key and st.button("💾 Save & Activate", type="primary", key="save_kimi"):
+                if api_key and st.button("Save & Activate", type="primary", key="save_kimi"):
                     if config_manager.save_config("kimi", api_key=api_key, model=model):
-                        st.success("✅ Configuration saved to .env file!")
-                        st.info("🔄 Please restart the app to activate the new configuration.")
+                        st.success("Configuration saved to .env file!")
+                        st.info("Please restart the app to activate the new configuration.")
                         st.balloons()
                     else:
-                        st.error("❌ Failed to save configuration")
+                        st.error("Failed to save configuration")
 
         elif provider == "OpenAI":
-            st.info("💡 OpenAI offers reliable GPT models. Get API key at openai.com")
+            st.info("Tip: OpenAI offers reliable GPT models. Get API key at openai.com")
 
             col1, col2 = st.columns(2)
             with col1:
@@ -303,25 +307,25 @@ with st.sidebar:
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🧪 Test Connection", key="test_openai"):
+                if st.button("Test Connection", key="test_openai"):
                     with st.spinner("Testing..."):
                         success, msg = config_manager.test_connection(
                             "openai", api_key=api_key, model=model
                         )
                         if success:
-                            st.success(f"✅ {msg}")
+                            st.success(f"[OK] {msg}")
                         else:
-                            st.error(f"❌ {msg}")
+                            st.error(f"[X] {msg}")
             with col2:
-                if api_key and st.button("💾 Save & Activate", type="primary", key="save_openai"):
+                if api_key and st.button("Save & Activate", type="primary", key="save_openai"):
                     if config_manager.save_config("openai", api_key=api_key, model=model):
-                        st.success("✅ Configuration saved to .env file!")
-                        st.info("🔄 Please restart the app to activate the new configuration.")
+                        st.success("Configuration saved to .env file!")
+                        st.info("Please restart the app to activate the new configuration.")
                     else:
-                        st.error("❌ Failed to save configuration")
+                        st.error("Failed to save configuration")
 
         elif provider == "DeepSeek":
-            st.info("💡 DeepSeek offers affordable, capable models. Get API key at deepseek.com")
+            st.info("Tip: DeepSeek offers affordable, capable models. Get API key at deepseek.com")
 
             api_key = st.text_input(
                 "DeepSeek API Key",
@@ -333,23 +337,23 @@ with st.sidebar:
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🧪 Test Connection", key="test_deepseek"):
+                if st.button("Test Connection", key="test_deepseek"):
                     with st.spinner("Testing..."):
                         success, msg = config_manager.test_connection("deepseek", api_key=api_key)
                         if success:
-                            st.success(f"✅ {msg}")
+                            st.success(f"[OK] {msg}")
                         else:
-                            st.error(f"❌ {msg}")
+                            st.error(f"[X] {msg}")
             with col2:
-                if api_key and st.button("💾 Save & Activate", type="primary", key="save_deepseek"):
+                if api_key and st.button("Save & Activate", type="primary", key="save_deepseek"):
                     if config_manager.save_config("deepseek", api_key=api_key):
-                        st.success("✅ Configuration saved to .env file!")
-                        st.info("🔄 Please restart the app to activate the new configuration.")
+                        st.success("Configuration saved to .env file!")
+                        st.info("Please restart the app to activate the new configuration.")
                     else:
-                        st.error("❌ Failed to save configuration")
+                        st.error("Failed to save configuration")
 
         elif provider == "Ollama (Local - Free)":
-            st.info("💡 Ollama runs locally for FREE. Install from ollama.com")
+            st.info("Tip: Ollama runs locally for FREE. Install from ollama.com")
 
             # Check Ollama status using config manager
             with st.spinner("Checking Ollama..."):
@@ -357,7 +361,7 @@ with st.sidebar:
                 ollama_running = len(ollama_models) > 0
 
             if ollama_running:
-                st.success(f"✅ Ollama is running with {len(ollama_models)} model(s)!")
+                st.success(f"[OK] Ollama is running with {len(ollama_models)} model(s)!")
 
                 if ollama_models:
                     st.write("**Currently installed:**")
@@ -388,10 +392,10 @@ with st.sidebar:
                 selected_model = st.selectbox(
                     "Choose Model",
                     all_options,
-                    format_func=lambda x: f"✅ {x}"
+                    format_func=lambda x: f"[INSTALLED] {x}"
                     if x in [m.replace(":latest", "") for m in ollama_models]
-                    else f"📥 {x} (not installed)",
-                    help="Select a model. ✅ = installed, 📥 = needs download",
+                    else f"[DOWNLOAD] {x} (not installed)",
+                    help="Select a model. [INSTALLED] = installed, [DOWNLOAD] = needs download",
                     key="ollama_model_select",
                 )
 
@@ -400,29 +404,29 @@ with st.sidebar:
                     if selected_model:
                         is_installed = any(selected_model in m for m in ollama_models)
                         if is_installed:
-                            if st.button("💾 Save & Activate", type="primary", key="save_ollama"):
+                            if st.button("Save & Activate", type="primary", key="save_ollama"):
                                 if config_manager.save_config("ollama", model=selected_model):
-                                    st.success(f"✅ Ollama with {selected_model} saved!")
-                                    st.info("🔄 Please restart the app to activate.")
+                                    st.success(f"[OK] Ollama with {selected_model} saved!")
+                                    st.info("Please restart the app to activate.")
                                 else:
-                                    st.error("❌ Failed to save configuration")
+                                    st.error("Failed to save configuration")
                         else:
-                            st.warning(f"⚠️ {selected_model} not installed")
+                            st.warning(f"[!] {selected_model} not installed")
                             st.code(f"ollama pull {selected_model}", language="bash")
 
                 with col2:
-                    if st.button("🔄 Refresh Model List", key="refresh_ollama"):
+                    if st.button("Refresh Model List", key="refresh_ollama"):
                         st.rerun()
 
             else:
-                st.error("❌ Ollama not running or no models installed")
+                st.error("[X] Ollama not running or no models installed")
                 st.code("ollama serve", language="bash")
                 st.caption("Run this in terminal to start Ollama")
 
                 st.code("ollama pull llama3.2", language="bash")
                 st.caption("Then pull a model (in another terminal)")
 
-            with st.expander("📖 Setup Instructions"):
+            with st.expander("Setup Instructions"):
                 st.markdown("""
                 **Step 1: Install Ollama**
                 ```bash
@@ -454,10 +458,10 @@ with st.sidebar:
         st.divider()
 
     # Debug mode toggle
-    st.session_state.debug_mode = st.checkbox("🐛 Debug Mode", value=st.session_state.debug_mode)
+    st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
 
     if st.session_state.debug_mode:
-        st.subheader("🔍 Debug Info")
+        st.subheader("Debug Info")
         st.json(
             {
                 "user_id": st.session_state.user_id,
@@ -471,7 +475,7 @@ with st.sidebar:
     st.divider()
 
     # File upload section
-    st.subheader("📁 Upload Documents")
+    st.subheader("Upload Documents")
 
     uploaded_files = st.file_uploader(
         "Drop files here",
@@ -508,39 +512,44 @@ with st.sidebar:
                         }
                     )
                     st.success(
-                        f"✅ {uploaded_file.name}: {result['chunks_indexed']} chunks indexed"
+                        f"[OK] {uploaded_file.name}: {result['chunks_indexed']} chunks indexed"
                     )
                 else:
-                    st.error(f"❌ {uploaded_file.name}: {result['error']}")
+                    st.error(f"[X] {uploaded_file.name}: {result['error']}")
 
             progress_bar.progress((idx + 1) / len(uploaded_files))
 
         progress_bar.empty()
         status_text.empty()
 
-    # Show uploaded files
+    # Show uploaded files - compact display with expander
     if st.session_state.uploaded_files:
-        st.subheader("📄 Your Documents")
-        for file_info in st.session_state.uploaded_files:
-            with st.container():
-                st.markdown(
-                    f"""
-                    <div class="file-card">
-                        <strong>{file_info["name"]}</strong><br/>
-                        <small style="color: #666;">{file_info["chunks"]} chunks indexed</small>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+        file_count = len(st.session_state.uploaded_files)
+        with st.expander(f"Your Documents ({file_count} files)", expanded=file_count <= 5):
+            # Show first 5 files, then "+ X more" indicator
+            display_files = st.session_state.uploaded_files[:5]
+            for file_info in display_files:
+                with st.container():
+                    st.markdown(
+                        f"""
+                        <div class="file-card">
+                            <strong>{file_info["name"]}</strong><br/>
+                            <small class="text-secondary">{file_info["chunks"]} chunks indexed</small>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            if file_count > 5:
+                st.caption(f"+ {file_count - 5} more file(s)...")
 
     # Danger zone - Clear all data
     st.divider()
-    with st.expander("🗑️ Danger Zone: Clear My Data"):
+    with st.expander("Danger Zone: Clear My Data"):
         st.warning("This will permanently delete all your conversations and uploaded documents!")
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🗑️ Clear Conversations Only", use_container_width=True):
+            if st.button("Clear Conversations Only", use_container_width=True):
                 conversations = conversation_manager.list_conversations(st.session_state.user_id)
                 deleted = 0
                 for conv in conversations:
@@ -549,29 +558,29 @@ with st.sidebar:
                     ):
                         deleted += 1
                 st.session_state.current_thread_id = None
-                st.success(f"✅ Deleted {deleted} conversations")
+                st.success(f"[OK] Deleted {deleted} conversations")
                 st.rerun()
 
         with col2:
-            if st.button("💥 Clear Everything", type="primary", use_container_width=True):
+            if st.button("Clear Everything", type="primary", use_container_width=True):
                 try:
                     # Delete all user data
                     result = asyncio.run(chat_engine.delete_all_user_data(st.session_state.user_id))
                     st.session_state.uploaded_files = []
                     st.session_state.current_thread_id = None
                     st.success(
-                        f"✅ Deleted {result['conversations_deleted']} conversations and "
+                        f"[OK] Deleted {result['conversations_deleted']} conversations and "
                         f"{result['document_chunks_deleted']} document chunks"
                     )
                     st.rerun()
                 except Exception as e:
-                    st.error(f"❌ Error clearing data: {e}")
+                    st.error(f"[X] Error clearing data: {e}")
                     if st.session_state.debug_mode:
                         st.exception(e)
 
     # Conversation list
     st.divider()
-    st.subheader("💬 Conversations")
+    st.subheader("Conversations")
 
     conversations = conversation_manager.list_conversations(st.session_state.user_id)
 
@@ -581,7 +590,7 @@ with st.sidebar:
             with col1:
                 title = conv["title"] or "Untitled Chat"
                 if st.button(
-                    f"💬 {title}",
+                    f"{title}",
                     key=f"conv_{conv['id']}",
                     use_container_width=True,
                     type="secondary"
@@ -591,27 +600,27 @@ with st.sidebar:
                     st.session_state.current_thread_id = conv["id"]
                     st.rerun()
             with col2:
-                if st.button("🗑️", key=f"del_{conv['id']}", help="Delete conversation"):
+                if st.button("X", key=f"del_{conv['id']}", help="Delete conversation"):
                     conversation_manager.delete_conversation(conv["id"], st.session_state.user_id)
                     if st.session_state.current_thread_id == conv["id"]:
                         st.session_state.current_thread_id = None
                     st.rerun()
 
     # New conversation button
-    if st.button("➕ New Conversation", use_container_width=True, type="primary"):
+    if st.button("New Conversation", use_container_width=True, type="primary"):
         thread = conversation_manager.create_thread(st.session_state.user_id, title="New Chat")
         st.session_state.current_thread_id = thread.id
         st.rerun()
 
 # Main chat area
-st.markdown('<div class="main-header">💬 Chat</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">Chat</div>', unsafe_allow_html=True)
 
 # Show LLM warning if not configured
 if not llm_available and not st.session_state.show_llm_setup:
     st.markdown(
         """
         <div class="warning-banner">
-            <strong>⚠️ AI Model Not Configured</strong><br/>
+            <strong>[!] AI Model Not Configured</strong><br/>
             You're in <strong>Fallback Mode</strong> with limited responses.<br/>
             For best results, configure an AI model in the sidebar.<br/>
             <strong>Recommended:</strong> Kimi K2.5 (free credits available)
@@ -622,12 +631,12 @@ if not llm_available and not st.session_state.show_llm_setup:
 
 if not st.session_state.current_thread_id:
     # Welcome screen
-    st.info("👋 Welcome! Upload documents and start chatting with AI.")
+    st.info("Welcome! Upload documents and start chatting with AI.")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("📚 What You Can Do")
+        st.subheader("What You Can Do")
         st.markdown("""
         - Upload PDFs, Word docs, CSVs, text files
         - Ask questions about your documents
@@ -636,7 +645,7 @@ if not st.session_state.current_thread_id:
         """)
 
     with col2:
-        st.subheader("🤖 AI Models Supported")
+        st.subheader("AI Models Supported")
         st.markdown("""
         - **Kimi K2.5** - Best quality (Recommended)
         - **OpenAI GPT-4** - Reliable, fast
@@ -645,7 +654,7 @@ if not st.session_state.current_thread_id:
         """)
 
     st.divider()
-    st.caption("💡 Tip: Click 'Configure AI Model' in the sidebar to set up your AI")
+    st.caption("Tip: Click 'Configure AI Model' in the sidebar to set up your AI")
 
 else:
     # Load current thread
@@ -667,7 +676,7 @@ else:
                 st.markdown(
                     f"""
                     <div class="chat-message assistant-message">
-                        <strong>🤖 Assistant:</strong><br/>{msg.content}
+                        <strong>Assistant:</strong><br/>{msg.content}
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -687,7 +696,7 @@ else:
                     # Show at most 3 unique sources
                     unique_citations = unique_citations[:3]
 
-                    with st.expander(f"📚 Sources ({len(unique_citations)})", expanded=False):
+                    with st.expander(f"Sources ({len(unique_citations)})", expanded=False):
                         for citation in unique_citations:
                             excerpt = (
                                 citation.excerpt[:120]
@@ -697,9 +706,9 @@ else:
                             st.markdown(
                                 f"""
                                 <div class="citation-box">
-                                    📄 <strong>{citation.source_file.split("/")[-1]}</strong>
+                                    <strong>{citation.source_file.split("/")[-1]}</strong>
                                     {f" (Page {citation.page_number})" if citation.page_number else ""}
-                                    <br/><em style="color: #666;">{excerpt}...</em>
+                                    <br/><em class="text-secondary">{excerpt}...</em>
                                 </div>
                                 """,
                                 unsafe_allow_html=True,
@@ -712,11 +721,13 @@ else:
             # Check for injection attempts
             check = injection_detector.check(user_input)
             if not check.is_safe:
-                st.warning(f"⚠️ {injection_detector.get_safe_alternative(user_input, check.reason)}")
+                st.warning(
+                    f"[!] {injection_detector.get_safe_alternative(user_input, check.reason)}"
+                )
             else:
                 # Show processing indicator
                 with st.spinner(
-                    f"🤖 Thinking... ({settings.llm_provider.upper() if llm_available else 'Fallback'})"
+                    f"Thinking... ({settings.llm_provider.upper() if llm_available else 'Fallback'})"
                 ):
                     try:
                         response = asyncio.run(
@@ -728,7 +739,7 @@ else:
                         )
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error: {e}")
+                        st.error(f"[X] Error: {e}")
                         if st.session_state.debug_mode:
                             st.exception(e)
     else:
