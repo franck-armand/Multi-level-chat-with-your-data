@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import shutil
 import sys
 from pathlib import Path
 
@@ -77,11 +78,9 @@ def cmd_list(args: argparse.Namespace) -> int:
                         size = file.stat().st_size / 1024
                         print(f"{i:2}. {file.name:<40} ({size:>7.1f} KB)")
             else:
-                print(
-                    "   No documents found. Use 'chatwithdocs upload <file>' to add documents.")
+                print("   No documents found. Use 'chatwithdocs upload <file>' to add documents.")
         else:
-            print(
-                "   No documents found. Use 'chatwithdocs upload <file>' to add documents.")
+            print("   No documents found. Use 'chatwithdocs upload <file>' to add documents.")
 
         return 0
 
@@ -193,8 +192,7 @@ def cmd_conversations(args: argparse.Namespace) -> int:
     for i, conv in enumerate(conversations[:20], 1):
         title = conv.get("title") or "Untitled"
         msg_count = (
-            len(manager.get_thread(conv["id"]).messages) if manager.get_thread(
-                conv["id"]) else 0
+            len(manager.get_thread(conv["id"]).messages) if manager.get_thread(conv["id"]) else 0
         )
         updated = conv.get("updated_at", "Unknown")
 
@@ -221,8 +219,7 @@ def cmd_config(args: argparse.Namespace) -> int:
         print("-" * 60)
         print(f"Provider: {config['provider'].upper()}")
         print(f"Model: {config.get('model', 'N/A')}")
-        print(
-            f"Status: {'OK: Connected' if config['llm_available'] else 'Error: Not Connected'}")
+        print(f"Status: {'OK: Connected' if config['llm_available'] else 'Error: Not Connected'}")
         if config.get("error"):
             print(f"Error: {config['error']}")
         return 0
@@ -255,14 +252,12 @@ def cmd_config(args: argparse.Namespace) -> int:
         elif provider in ["openai", "deepseek", "kimi"]:
             if not args.api_key:
                 print(f"Error: API key required for {provider}")
-                print(
-                    f"   Usage: chatwithdocs config --provider {provider} --api-key <key>")
+                print(f"   Usage: chatwithdocs config --provider {provider} --api-key <key>")
                 return 1
 
             # Test connection first
             print(f"Test: Testing {provider} connection...")
-            success, msg = config_manager.test_connection(
-                provider, api_key=args.api_key)
+            success, msg = config_manager.test_connection(provider, api_key=args.api_key)
 
             if success:
                 # Save
@@ -298,15 +293,13 @@ def cmd_config(args: argparse.Namespace) -> int:
 
     if provider == "ollama":
         return cmd_config(
-            argparse.Namespace(provider="ollama",
-                               api_key=None, model=None, show=False)
+            argparse.Namespace(provider="ollama", api_key=None, model=None, show=False)
         )
     else:
         api_key = input(f"Enter {provider.upper()} API key: ").strip()
         if api_key:
             return cmd_config(
-                argparse.Namespace(provider=provider,
-                                   api_key=api_key, model=None, show=False)
+                argparse.Namespace(provider=provider, api_key=api_key, model=None, show=False)
             )
         else:
             print("Error: API key required")
@@ -327,8 +320,13 @@ def cmd_server(args: argparse.Namespace) -> int:
 
         import uvicorn
 
-        uvicorn.run("api.main:app", host="0.0.0.0",
-                    port=args.port, reload=args.reload)
+        # Add project root to path so uvicorn can find api.main
+        cli_dir = Path(__file__).parent
+        project_root = cli_dir.parent.parent
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+
+        uvicorn.run("api.main:app", host="0.0.0.0", port=args.port, reload=args.reload)
 
     elif args.ui:
         print("Starting: Streamlit UI...")
@@ -395,9 +393,18 @@ def cmd_clear(args: argparse.Namespace) -> int:
 
     result = asyncio.run(clear_docs())
 
+    # Delete files from filesystem
+    upload_dir = Path(f"data/uploads/{user_id}")
+    files_deleted = 0
+    if upload_dir.exists():
+        # Count files before deletion
+        files_deleted = len(list(upload_dir.rglob("*")))
+        shutil.rmtree(upload_dir)
+
     print("Success: Cleared:")
     print(f"   Conversations: {deleted_conv}")
     print(f"   Document chunks: {result.get('document_chunks_deleted', 0)}")
+    print(f"   Files deleted: {files_deleted}")
 
     return 0
 
@@ -423,8 +430,7 @@ Examples:
         """,
     )
 
-    parser.add_argument("--version", action="version",
-                        version="%(prog)s 2.0.0")
+    parser.add_argument("--version", action="version", version="%(prog)s 2.0.0")
 
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
@@ -435,8 +441,7 @@ Examples:
         description="Upload a PDF, DOCX, CSV, TXT, or MD file",
     )
     upload_parser.add_argument("file", help="Path to document file")
-    upload_parser.add_argument(
-        "--user", "-u", help="User ID (default: cli_user)")
+    upload_parser.add_argument("--user", "-u", help="User ID (default: cli_user)")
     upload_parser.set_defaults(func=cmd_upload)
 
     # List command
@@ -454,8 +459,7 @@ Examples:
         "question", nargs="?", help="Question to ask (if not provided, enters interactive mode)"
     )
     chat_parser.add_argument("--user", "-u", help="User ID")
-    chat_parser.add_argument(
-        "--thread", "-t", help="Thread ID for conversation continuity")
+    chat_parser.add_argument("--thread", "-t", help="Thread ID for conversation continuity")
     chat_parser.add_argument(
         "--interactive", "-i", action="store_true", help="Interactive chat mode"
     )
@@ -466,13 +470,11 @@ Examples:
         "conversations", aliases=["conv"], help="List or manage conversations"
     )
     conv_parser.add_argument("--user", "-u", help="User ID")
-    conv_parser.add_argument(
-        "--delete", "-d", help="Delete conversation by ID")
+    conv_parser.add_argument("--delete", "-d", help="Delete conversation by ID")
     conv_parser.set_defaults(func=cmd_conversations)
 
     # Config command
-    config_parser = subparsers.add_parser(
-        "config", help="Configure AI model settings")
+    config_parser = subparsers.add_parser("config", help="Configure AI model settings")
     config_parser.add_argument(
         "--show", "-s", action="store_true", help="Show current configuration"
     )
@@ -480,18 +482,14 @@ Examples:
         "--provider", "-p", choices=["ollama", "openai", "deepseek", "kimi"], help="AI provider"
     )
     config_parser.add_argument("--api-key", "-k", help="API key")
-    config_parser.add_argument(
-        "--model", "-m", help="Model name (e.g., llama3.2, gpt-4o-mini)")
+    config_parser.add_argument("--model", "-m", help="Model name (e.g., llama3.2, gpt-4o-mini)")
     config_parser.set_defaults(func=cmd_config)
 
     # Server command
     server_parser = subparsers.add_parser("server", help="Start web server")
-    server_parser.add_argument(
-        "--api", action="store_true", help="Start FastAPI server")
-    server_parser.add_argument(
-        "--ui", action="store_true", help="Start Streamlit UI server")
-    server_parser.add_argument(
-        "--port", "-p", type=int, default=8501, help="Port number")
+    server_parser.add_argument("--api", action="store_true", help="Start FastAPI server")
+    server_parser.add_argument("--ui", action="store_true", help="Start Streamlit UI server")
+    server_parser.add_argument("--port", "-p", type=int, default=8501, help="Port number")
     server_parser.add_argument(
         "--reload", action="store_true", help="Auto-reload on code changes (API only)"
     )
@@ -503,8 +501,7 @@ Examples:
         help="Clear all data (WARNING: destructive!)",
         description="Delete all conversations and documents",
     )
-    clear_parser.add_argument(
-        "--force", "-f", action="store_true", help="Skip confirmation")
+    clear_parser.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
     clear_parser.add_argument("--user", "-u", help="User ID")
     clear_parser.set_defaults(func=cmd_clear)
 
