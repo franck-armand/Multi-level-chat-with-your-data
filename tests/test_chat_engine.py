@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
+import tempfile
 
 from chatwithdocs.chat.engine import AnswerabilityDecision, ChatEngine
 from chatwithdocs.chat.models import Thread
+from chatwithdocs.config import settings
+from chatwithdocs.obs.trace import Trace
 from chatwithdocs.retrieval.hybrid_search import HybridSearchResult
 from chatwithdocs.storage.vectors import ChunkMetadata
 
@@ -211,3 +215,48 @@ class TestChatEngineResponseGuards:
         )
 
         assert "Je n'ai pas assez d'elements fiables" in response
+
+    def test_answerability_trace_data_contains_scores_and_reason(self):
+        engine = ChatEngine.__new__(ChatEngine)
+        results = [
+            HybridSearchResult(
+                id="chunk-1",
+                content="The contract allows termination with 30 days notice.",
+                score=0.08,
+                metadata=ChunkMetadata(source_file="contract.txt", file_type="txt", user_id="user1"),
+            ),
+            HybridSearchResult(
+                id="chunk-2",
+                content="Termination requires written notice.",
+                score=0.06,
+                metadata=ChunkMetadata(source_file="contract.txt", file_type="txt", user_id="user1"),
+            ),
+        ]
+        decision = engine._assess_answerability("What does the contract say?", results, "document_question")
+
+        trace_data = engine._build_answerability_trace_data(
+            "What does the contract say?", results, "document_question", decision
+        )
+
+        assert trace_data["status"] == "answerable"
+        assert trace_data["reason"] == "sufficient_evidence"
+        assert trace_data["result_count"] == 2
+        assert trace_data["top_score"] == 0.08
+
+    def test_chat_trace_is_written_when_enabled(self):
+        engine = ChatEngine.__new__(ChatEngine)
+        trace = Trace(trace_id="trace-1", ts_start_ms=1, meta={})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_enabled = settings.enable_chat_tracing
+            original_path = settings.chat_trace_file
+            try:
+                settings.enable_chat_tracing = True
+                settings.chat_trace_file = Path(tmpdir) / "chat_traces.jsonl"
+                engine._write_chat_trace(trace)
+                content = settings.chat_trace_file.read_text(encoding="utf-8")
+            finally:
+                settings.enable_chat_tracing = original_enabled
+                settings.chat_trace_file = original_path
+
+        assert '"trace_id": "trace-1"' in content

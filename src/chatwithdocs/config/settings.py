@@ -131,6 +131,14 @@ class Settings(BaseSettings):
     context_window_tokens: int = Field(
         default=4000, description="Maximum tokens for context window"
     )
+    enable_chat_tracing: bool = Field(
+        default=True,
+        description="Write chat retrieval/answerability traces to JSONL",
+    )
+    chat_trace_file: Path = Field(
+        default=Path("./logs/chat_traces.jsonl"),
+        description="Path for chat trace JSONL output",
+    )
 
     # File upload configuration
     max_file_size_mb: int = Field(default=50, description="Maximum file upload size in MB")
@@ -163,7 +171,7 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1000, description="Maximum chunk size in characters")
     chunk_overlap: int = Field(default=200, description="Overlap between chunks in characters")
 
-    @field_validator("data_dir", "upload_dir", "vector_store_dir", mode="before")
+    @field_validator("data_dir", "upload_dir", "vector_store_dir", "chat_trace_file", mode="before")
     @classmethod
     def ensure_path(cls, v: Any) -> Path:
         """Ensure path is a Path object."""

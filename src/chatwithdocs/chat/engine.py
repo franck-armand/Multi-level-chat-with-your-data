@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -11,6 +12,8 @@ from chatwithdocs.chat.models import Citation, MessageRole, Thread
 from chatwithdocs.config import settings
 from chatwithdocs.embedding import EmbeddingRouter
 from chatwithdocs.llm.client import LLMMessage, LLMRouter
+from chatwithdocs.obs.sinks import JsonlTraceSink
+from chatwithdocs.obs.trace import Trace, TraceEvent, new_trace, trace_event
 from chatwithdocs.retrieval import HybridSearcher, get_reranker
 from chatwithdocs.retrieval.citation import CitationBuilder
 from chatwithdocs.retrieval.hybrid_search import HybridSearchResult
@@ -213,38 +216,65 @@ class ChatEngine:
 
         # Add user message
         self.conversation_manager.add_user_message(thread.id, message)
+        trace = self._new_chat_trace(user_id, thread.id, message)
 
-        intent = await self._resolve_query_intent(message)
+        with trace_event(trace, "chat.intent.resolve", {"message_length": len(message)}):
+            intent = await self._resolve_query_intent(message)
+        self._record_trace_event(
+            trace,
+            "chat.intent.result",
+            {"intent": intent, "language": self._detect_response_language(message)},
+        )
         search_results = []
         if intent != "smalltalk":
             # Retrieve context (filtered by user_id)
-            search_results = await self._retrieve_context(message, user_id)
+            with trace_event(trace, "chat.retrieve", {"k": 10}):
+                search_results = await self._retrieve_context(message, user_id)
+        self._record_trace_event(
+            trace,
+            "chat.retrieve.result",
+            self._build_retrieval_trace_data(search_results),
+        )
 
         # Rerank if enabled
         if settings.rerank_results and search_results:
             from chatwithdocs.retrieval.reranker import RerankedResult
 
-            rerank_inputs = [
-                RerankedResult(
-                    id=r.id,
-                    content=r.content,
-                    score=r.score,
-                    original_score=r.score,
-                    metadata={
-                        "source_file": r.metadata.source_file,
-                        "page_number": r.metadata.page_number,
-                        "section": r.metadata.section_header,
-                    },
-                )
-                for r in search_results
-            ]
-            reranked = await self.reranker.rerank_async(message, rerank_inputs)
+            with trace_event(trace, "chat.rerank", {"input_results": len(search_results)}):
+                rerank_inputs = [
+                    RerankedResult(
+                        id=r.id,
+                        content=r.content,
+                        score=r.score,
+                        original_score=r.score,
+                        metadata={
+                            "source_file": r.metadata.source_file,
+                            "page_number": r.metadata.page_number,
+                            "section": r.metadata.section_header,
+                        },
+                    )
+                    for r in search_results
+                ]
+                reranked = await self.reranker.rerank_async(message, rerank_inputs)
 
             # Update search_results order based on reranking
             reranked_ids = {r.id: i for i, r in enumerate(reranked)}
             search_results.sort(key=lambda x: reranked_ids.get(x.id, 999))
+            self._record_trace_event(
+                trace,
+                "chat.rerank.result",
+                {
+                    "returned_results": len(reranked),
+                    "top_rerank_scores": [round(result.score, 6) for result in reranked[:3]],
+                },
+            )
 
         answerability = self._assess_answerability(message, search_results, intent)
+        self._record_trace_event(
+            trace,
+            "chat.answerability",
+            self._build_answerability_trace_data(message, search_results, intent, answerability),
+        )
 
         # Build citations
         citation_data = [(r.id, r.content, r.metadata, r.score) for r in search_results]
@@ -259,6 +289,17 @@ class ChatEngine:
             intent=intent,
             answerability=answerability,
         )
+        self._record_trace_event(
+            trace,
+            "chat.response",
+            {
+                "intent": intent,
+                "answerability_status": answerability.status,
+                "response_length": len(response_content),
+                "citation_count": len(citations),
+            },
+        )
+        self._write_chat_trace(trace)
 
         # Add assistant message
         self.conversation_manager.add_assistant_message(thread.id, response_content, citations)
@@ -572,6 +613,47 @@ class ChatEngine:
             "Please point me to the document, section, or topic you want me to use."
         )
 
+    def _new_chat_trace(self, user_id: str, thread_id: str, message: str) -> Trace:
+        """Create a chat trace with request metadata."""
+        return new_trace(
+            {
+                "surface": "chat_engine",
+                "user_id": user_id,
+                "thread_id": thread_id,
+                "message_length": len(message),
+            }
+        )
+
+    def _record_trace_event(self, trace: Trace, name: str, data: dict) -> None:
+        """Append an instantaneous trace event."""
+        t_ms = int(time.time() * 1000)
+        trace.events.append(
+            TraceEvent(
+                name=name,
+                t0_ms=t_ms,
+                t1_ms=t_ms,
+                ms=0,
+                data=data,
+            )
+        )
+
+    def _write_chat_trace(self, trace: Trace) -> None:
+        """Persist the chat trace if tracing is enabled."""
+        if not settings.enable_chat_tracing:
+            return
+
+        trace.finish()
+        JsonlTraceSink(settings.chat_trace_file).write(trace)
+
+    def _build_retrieval_trace_data(self, search_results: List[HybridSearchResult]) -> dict:
+        """Summarize retrieval output for tracing."""
+        return {
+            "result_count": len(search_results),
+            "top_scores": [round(result.score, 6) for result in search_results[:3]],
+            "top_sources": [result.metadata.source_file for result in search_results[:3]],
+            "top_chunk_ids": [result.id for result in search_results[:3]],
+        }
+
     def _detect_response_language(self, query: str) -> str:
         """Detect whether the guard responses should be in French or English."""
         normalized = self._normalize_text(query)
@@ -579,6 +661,35 @@ class ChatEngine:
         if any(token in FRENCH_LANGUAGE_HINTS for token in tokens):
             return "fr"
         return "en"
+
+    def _build_answerability_trace_data(
+        self,
+        query: str,
+        search_results: List[HybridSearchResult],
+        intent: str,
+        answerability: AnswerabilityDecision,
+    ) -> dict:
+        """Build structured answerability diagnostics for tracing."""
+        normalized_query = self._normalize_text(query)
+        tokens = normalized_query.split()
+        top_score = search_results[0].score if search_results else 0.0
+        avg_top_scores = (
+            sum(result.score for result in search_results[:3]) / min(len(search_results), 3)
+            if search_results
+            else 0.0
+        )
+        return {
+            "intent": intent,
+            "status": answerability.status,
+            "reason": answerability.reason,
+            "confidence": answerability.confidence,
+            "result_count": len(search_results),
+            "top_score": round(top_score, 6),
+            "avg_top_3_score": round(avg_top_scores, 6),
+            "has_document_hint": any(token in DOCUMENT_HINTS for token in tokens),
+            "is_vague_query": any(pattern in normalized_query for pattern in VAGUE_QUERY_PATTERNS),
+            "query_preview": query[:120],
+        }
 
     def _assess_answerability(
         self,
