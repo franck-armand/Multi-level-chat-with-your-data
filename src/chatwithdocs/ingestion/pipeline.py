@@ -10,6 +10,7 @@ from chatwithdocs.ingestion.extractors.docx import DOCXExtractor
 from chatwithdocs.ingestion.extractors.pdf import PDFExtractor
 from chatwithdocs.ingestion.extractors.structured import StructuredExtractor
 from chatwithdocs.ingestion.extractors.text import TextExtractor
+from chatwithdocs.retrieval import HybridSearcher
 from chatwithdocs.security import FileSandbox
 from chatwithdocs.security.audit import audit_logger
 from chatwithdocs.storage.vectors import ChromaVectorStore, ChunkMetadata
@@ -37,6 +38,7 @@ class IngestionPipeline:
     ):
         self.vector_store = vector_store or ChromaVectorStore()
         self.embedder = embedder or EmbeddingRouter()
+        self.hybrid_searcher = HybridSearcher(self.vector_store, self.embedder)
         self.sandbox = sandbox or FileSandbox()
 
         # Register extractors
@@ -208,7 +210,7 @@ class IngestionPipeline:
             )
 
         # Store in vector DB
-        ids = await self.vector_store.add_chunks(storage_chunks, embeddings, metadata_list)
+        ids = await self.hybrid_searcher.add_to_index(storage_chunks, embeddings, metadata_list)
 
         return len(ids)
 
@@ -222,7 +224,7 @@ class IngestionPipeline:
             True if deleted, False otherwise
         """
         try:
-            await self.vector_store.delete_by_source(source_file)
+            await self.hybrid_searcher.delete_by_source(source_file)
             logger.info(f"Deleted all chunks for {source_file}")
             return True
         except Exception as e:

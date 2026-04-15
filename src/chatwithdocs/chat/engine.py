@@ -394,7 +394,7 @@ class ChatEngine:
                 deleted_conversations += 1
 
         # Delete all documents from vector store
-        deleted_chunks = await self.vector_store.delete_by_user(user_id)
+        deleted_chunks = await self.hybrid_searcher.delete_by_user(user_id)
 
         return {
             "conversations_deleted": deleted_conversations,
