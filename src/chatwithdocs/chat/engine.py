@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from typing import List, Optional
 
 from chatwithdocs.chat.manager import ConversationManager
@@ -14,6 +16,98 @@ from chatwithdocs.retrieval.hybrid_search import HybridSearchResult
 from chatwithdocs.storage.vectors import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
+
+SMALLTALK_ONLY_PATTERNS = {
+    "hello",
+    "hi",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "how are you",
+    "thanks",
+    "thank you",
+    "bonjour",
+    "salut",
+    "bonsoir",
+    "coucou",
+    "ca va",
+    "comment ca va",
+    "merci",
+    "merci beaucoup",
+}
+
+SMALLTALK_TOKENS = {
+    "hello",
+    "hi",
+    "hey",
+    "bonjour",
+    "salut",
+    "bonsoir",
+    "coucou",
+    "thanks",
+    "thank",
+    "merci",
+}
+
+DOCUMENT_HINTS = {
+    "document",
+    "doc",
+    "file",
+    "pdf",
+    "csv",
+    "contract",
+    "report",
+    "agreement",
+    "upload",
+    "uploaded",
+    "page",
+    "section",
+    "clause",
+    "article",
+    "documento",
+    "fichier",
+    "contrat",
+    "rapport",
+    "piece",
+    "pieces",
+    "televerse",
+    "uploades",
+    "page",
+    "section",
+    "clause",
+    "article",
+}
+
+QUESTION_HINTS = {
+    "what",
+    "which",
+    "where",
+    "when",
+    "why",
+    "how",
+    "who",
+    "does",
+    "do",
+    "can",
+    "could",
+    "please",
+    "que",
+    "quel",
+    "quelle",
+    "quels",
+    "quelles",
+    "ou",
+    "quand",
+    "pourquoi",
+    "comment",
+    "est ce",
+    "peux",
+    "peut",
+    "montre",
+    "resume",
+    "explique",
+}
 
 
 class ChatEngine:
@@ -66,11 +160,14 @@ class ChatEngine:
         # Add user message
         self.conversation_manager.add_user_message(thread.id, message)
 
-        # Retrieve context (filtered by user_id)
-        search_results = await self._retrieve_context(message, user_id)
+        intent = self._classify_query_intent(message)
+        search_results = []
+        if intent != "smalltalk":
+            # Retrieve context (filtered by user_id)
+            search_results = await self._retrieve_context(message, user_id)
 
         # Rerank if enabled
-        if settings.rerank_results:
+        if settings.rerank_results and search_results:
             from chatwithdocs.retrieval.reranker import RerankedResult
 
             rerank_inputs = [
@@ -98,7 +195,13 @@ class ChatEngine:
         citations = self.citation_builder.build_citations(citation_data)
 
         # Generate response
-        response_content = await self._generate_response(message, search_results, citations, thread)
+        response_content = await self._generate_response(
+            message,
+            search_results,
+            citations,
+            thread,
+            intent=intent,
+        )
 
         # Add assistant message
         self.conversation_manager.add_assistant_message(thread.id, response_content, citations)
@@ -185,6 +288,7 @@ class ChatEngine:
         search_results: List,
         citations: List[Citation],
         thread: Thread,
+        intent: str = "document_question",
     ) -> str:
         """Generate a response based on retrieved context using LLM.
 
@@ -197,10 +301,19 @@ class ChatEngine:
         Returns:
             Generated response text
         """
+        if intent == "smalltalk":
+            return self._build_smalltalk_response()
+
         if not search_results:
+            if intent == "mixed":
+                return (
+                    f"{self._build_smalltalk_response()} "
+                    "I couldn't find supporting information for the document part of your message in the files you uploaded yet. "
+                    "Please mention the document/topic you want me to inspect, or upload the relevant file."
+                )
             return (
-                "I couldn't find relevant information in your documents to answer "
-                f"this question. Please try rephrasing or upload documents related to: {query}"
+                "I couldn't find supporting information for that in your uploaded documents. "
+                "Please rephrase the question, mention the document/topic you want, or upload relevant files."
             )
 
         # Build context from search results (without source numbers to avoid confusion)
@@ -264,11 +377,46 @@ class ChatEngine:
         answer = answer.replace("- [x]", "- ")
         answer = answer.replace("- [X]", "- ")
         # Remove file paths if they appear
-        import re
-
         answer = re.sub(r"data/uploads/[^\s]+/", "", answer)
 
+        if intent == "mixed":
+            answer = f"{self._build_smalltalk_response()} {answer}"
+
         return answer.strip()
+
+    def _classify_query_intent(self, query: str) -> str:
+        """Classify the query as smalltalk, document question, or mixed."""
+        normalized = self._normalize_text(query)
+        if not normalized:
+            return "document_question"
+
+        if normalized in SMALLTALK_ONLY_PATTERNS:
+            return "smalltalk"
+
+        tokens = set(normalized.split())
+        has_smalltalk = any(token in SMALLTALK_TOKENS for token in tokens)
+        has_document_hint = any(token in DOCUMENT_HINTS for token in tokens)
+        has_question_hint = any(token in QUESTION_HINTS for token in tokens) or "?" in query
+
+        if has_smalltalk and (has_document_hint or has_question_hint):
+            return "mixed"
+        if has_smalltalk and len(tokens) <= 4:
+            return "smalltalk"
+        return "document_question"
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for simple intent classification."""
+        ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+        normalized = re.sub(r"[^a-z0-9\s]", " ", ascii_text.lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
+    def _build_smalltalk_response(self) -> str:
+        """Return a friendly conversational opener."""
+        return (
+            "Bonjour! Hello! I'm here to help with questions about your uploaded documents. "
+            "Ask about a file, a topic inside it, or upload documents if you want grounded answers."
+        )
 
     def _build_local_response(self, query: str, context: str, citations: List[Citation]) -> str:
         """Build a local deterministic response as fallback.
