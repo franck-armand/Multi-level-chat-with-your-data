@@ -75,3 +75,29 @@ class TestChatEngineResponseGuards:
 
         assert "uploaded documents" in response
         assert "supporting information" in response
+
+    def test_ambiguous_query_can_be_routed_by_model_to_smalltalk(self):
+        engine = ChatEngine.__new__(ChatEngine)
+
+        async def fake_model_classifier(query: str) -> str:
+            assert query == "sup"
+            return "smalltalk"
+
+        engine._classify_query_intent_with_model = fake_model_classifier
+
+        intent = asyncio.run(engine._resolve_query_intent("sup"))
+
+        assert intent == "smalltalk"
+
+    def test_ambiguous_query_falls_back_to_document_question_on_invalid_model_output(self):
+        engine = ChatEngine.__new__(ChatEngine)
+
+        async def fake_model_classifier(query: str) -> str | None:
+            assert query == "hmm"
+            return None
+
+        engine._classify_query_intent_with_model = fake_model_classifier
+
+        intent = asyncio.run(engine._resolve_query_intent("hmm"))
+
+        assert intent == "document_question"

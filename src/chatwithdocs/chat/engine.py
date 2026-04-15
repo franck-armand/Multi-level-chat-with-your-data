@@ -35,6 +35,7 @@ SMALLTALK_ONLY_PATTERNS = {
     "comment ca va",
     "merci",
     "merci beaucoup",
+    "yo",
 }
 
 SMALLTALK_TOKENS = {
@@ -109,6 +110,8 @@ QUESTION_HINTS = {
     "explique",
 }
 
+ALLOWED_QUERY_INTENTS = {"smalltalk", "document_question", "mixed"}
+
 
 class ChatEngine:
     """Main chat engine orchestrating retrieval and response generation.
@@ -160,7 +163,7 @@ class ChatEngine:
         # Add user message
         self.conversation_manager.add_user_message(thread.id, message)
 
-        intent = self._classify_query_intent(message)
+        intent = await self._resolve_query_intent(message)
         search_results = []
         if intent != "smalltalk":
             # Retrieve context (filtered by user_id)
@@ -385,7 +388,7 @@ class ChatEngine:
         return answer.strip()
 
     def _classify_query_intent(self, query: str) -> str:
-        """Classify the query as smalltalk, document question, or mixed."""
+        """Classify the query as smalltalk, document question, mixed, or ambiguous."""
         normalized = self._normalize_text(query)
         if not normalized:
             return "document_question"
@@ -402,7 +405,47 @@ class ChatEngine:
             return "mixed"
         if has_smalltalk and len(tokens) <= 4:
             return "smalltalk"
+        if not has_document_hint and not has_question_hint and len(tokens) <= 6:
+            return "ambiguous"
         return "document_question"
+
+    async def _resolve_query_intent(self, query: str) -> str:
+        """Resolve query intent using rules first, then the model for ambiguous cases."""
+        intent = self._classify_query_intent(query)
+        if intent != "ambiguous":
+            return intent
+
+        model_intent = await self._classify_query_intent_with_model(query)
+        if model_intent in ALLOWED_QUERY_INTENTS:
+            return model_intent
+        return "document_question"
+
+    async def _classify_query_intent_with_model(self, query: str) -> str | None:
+        """Use the LLM as a fallback intent classifier for ambiguous queries."""
+        router = LLMRouter()
+        messages = [
+            LLMMessage(
+                role="system",
+                content=(
+                    "Classify the user's message into exactly one label: "
+                    "smalltalk, document_question, or mixed. "
+                    "Use smalltalk for greetings, pleasantries, or conversational openers. "
+                    "Use document_question for requests that should be answered from uploaded files. "
+                    "Use mixed for messages that combine smalltalk with a document request. "
+                    "Reply with only the label."
+                ),
+            ),
+            LLMMessage(role="user", content=query[:300]),
+        ]
+
+        response = await router.generate(messages, temperature=0.0, max_tokens=5)
+        if response.error or not response.content:
+            return None
+
+        normalized = self._normalize_text(response.content)
+        if normalized in ALLOWED_QUERY_INTENTS:
+            return normalized
+        return None
 
     def _normalize_text(self, text: str) -> str:
         """Normalize text for simple intent classification."""
