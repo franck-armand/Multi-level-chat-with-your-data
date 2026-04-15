@@ -10,11 +10,12 @@ Provides REST API endpoints for:
 from __future__ import annotations
 
 import logging
+import shutil
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -75,7 +76,6 @@ class ChatRequest(BaseModel):
     """Chat request model."""
 
     message: str
-    user_id: str
     thread_id: str | None = None
 
 
@@ -84,14 +84,14 @@ class ChatResponse(BaseModel):
 
     thread_id: str
     content: str
-    citations: List[dict]
-    sources: List[str]
+    citations: list[dict]
+    sources: list[str]
 
 
 class ConversationListResponse(BaseModel):
     """Conversation list response."""
 
-    conversations: List[dict]
+    conversations: list[dict]
 
 
 class UploadResponse(BaseModel):
@@ -107,6 +107,24 @@ class ErrorResponse(BaseModel):
     """Error response model."""
 
     detail: str
+
+
+def get_current_user_id(x_user_id: str | None = Header(default=None, alias="X-User-Id")) -> str:
+    """Resolve the caller identity from the required request header."""
+    if x_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-User-Id header",
+        )
+
+    user_id = x_user_id.strip()
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-User-Id header must not be blank",
+        )
+
+    return user_id
 
 
 # Health check endpoint
@@ -126,11 +144,11 @@ async def health_check():
 
 # Chat endpoint
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user_id: str = Depends(get_current_user_id)):
     """Send a chat message and get AI response.
 
     Args:
-        request: Chat request with message, user_id, and optional thread_id
+        request: Chat request with message and optional thread_id
 
     Returns:
         AI response with citations from documents
@@ -154,7 +172,7 @@ async def chat(request: ChatRequest):
     try:
 
         response = await chat_engine.chat(
-            user_id=request.user_id,
+            user_id=user_id,
             thread_id=request.thread_id,
             message=request.message,
         )
@@ -178,13 +196,13 @@ async def chat(request: ChatRequest):
 @app.post("/api/upload", response_model=UploadResponse, tags=["Files"])
 async def upload_file(
     file: UploadFile = File(...),
-    user_id: str = Form(...),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Upload and index a document.
 
     Args:
         file: Document file to upload (PDF, DOCX, CSV, TXT, MD)
-        user_id: User identifier
+        user_id: User identifier resolved from request header
 
     Returns:
         Upload status with chunks indexed
@@ -207,8 +225,6 @@ async def upload_file(
 
     try:
         # Save uploaded file temporarily
-        import tempfile
-
         temp_dir = tempfile.mkdtemp()
         temp_path = Path(temp_dir) / file.filename
 
@@ -217,9 +233,6 @@ async def upload_file(
 
         # Ingest the file
         result = await ingestion_pipeline.ingest_file(temp_path, user_id)
-
-        # Cleanup temp file
-        temp_path.unlink()
 
         return UploadResponse(
             success=result["success"],
@@ -234,17 +247,21 @@ async def upload_file(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"File upload failed: {str(e)}",
         )
+    finally:
+        if "temp_dir" in locals():
+            temp_path_value = locals().get("temp_path")
+            if isinstance(temp_path_value, Path) and temp_path_value.exists():
+                temp_path_value.unlink()
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 # List conversations endpoint
-@app.get(
-    "/api/conversations/{user_id}", response_model=ConversationListResponse, tags=["Conversations"]
-)
-async def list_conversations(user_id: str):
+@app.get("/api/conversations", response_model=ConversationListResponse, tags=["Conversations"])
+async def list_conversations(user_id: str = Depends(get_current_user_id)):
     """List all conversations for a user.
 
     Args:
-        user_id: User identifier
+        user_id: User identifier resolved from request header
 
     Returns:
         List of conversations
@@ -267,13 +284,13 @@ async def list_conversations(user_id: str):
 
 
 # Get conversation history endpoint
-@app.get("/api/conversations/{user_id}/{thread_id}", tags=["Conversations"])
-async def get_conversation(user_id: str, thread_id: str):
+@app.get("/api/conversations/{thread_id}", tags=["Conversations"])
+async def get_conversation(thread_id: str, user_id: str = Depends(get_current_user_id)):
     """Get full conversation history.
 
     Args:
-        user_id: User identifier
         thread_id: Conversation thread ID
+        user_id: User identifier resolved from request header
 
     Returns:
         Conversation details with messages
@@ -307,13 +324,13 @@ async def get_conversation(user_id: str, thread_id: str):
 
 
 # Delete conversation endpoint
-@app.delete("/api/conversations/{user_id}/{thread_id}", tags=["Conversations"])
-async def delete_conversation(user_id: str, thread_id: str):
+@app.delete("/api/conversations/{thread_id}", tags=["Conversations"])
+async def delete_conversation(thread_id: str, user_id: str = Depends(get_current_user_id)):
     """Delete a conversation.
 
     Args:
-        user_id: User identifier
         thread_id: Conversation thread ID
+        user_id: User identifier resolved from request header
 
     Returns:
         Deletion status
