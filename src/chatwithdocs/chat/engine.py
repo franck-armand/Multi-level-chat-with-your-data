@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from dataclasses import dataclass
 from typing import List, Optional
 
 from chatwithdocs.chat.manager import ConversationManager
@@ -111,6 +112,56 @@ QUESTION_HINTS = {
 }
 
 ALLOWED_QUERY_INTENTS = {"smalltalk", "document_question", "mixed"}
+FRENCH_LANGUAGE_HINTS = {
+    "bonjour",
+    "salut",
+    "bonsoir",
+    "coucou",
+    "merci",
+    "contrat",
+    "rapport",
+    "fichier",
+    "document",
+    "quel",
+    "quelle",
+    "quels",
+    "quelles",
+    "comment",
+    "pourquoi",
+    "quand",
+    "peux",
+    "peut",
+    "montre",
+    "resume",
+    "explique",
+    "page",
+    "section",
+}
+VAGUE_QUERY_PATTERNS = (
+    "what about this",
+    "what about that",
+    "and this",
+    "and that",
+    "this one",
+    "that one",
+    "tell me more",
+    "can you elaborate",
+    "et celui ci",
+    "et celle ci",
+    "et ca",
+    "et ceci",
+    "ce document",
+    "ce fichier",
+)
+
+
+@dataclass
+class AnswerabilityDecision:
+    """Decision produced by the retrieval-quality gate."""
+
+    status: str
+    reason: str
+    confidence: float
 
 
 class ChatEngine:
@@ -193,6 +244,8 @@ class ChatEngine:
             reranked_ids = {r.id: i for i, r in enumerate(reranked)}
             search_results.sort(key=lambda x: reranked_ids.get(x.id, 999))
 
+        answerability = self._assess_answerability(message, search_results, intent)
+
         # Build citations
         citation_data = [(r.id, r.content, r.metadata, r.score) for r in search_results]
         citations = self.citation_builder.build_citations(citation_data)
@@ -204,6 +257,7 @@ class ChatEngine:
             citations,
             thread,
             intent=intent,
+            answerability=answerability,
         )
 
         # Add assistant message
@@ -292,6 +346,7 @@ class ChatEngine:
         citations: List[Citation],
         thread: Thread,
         intent: str = "document_question",
+        answerability: AnswerabilityDecision | None = None,
     ) -> str:
         """Generate a response based on retrieved context using LLM.
 
@@ -304,20 +359,23 @@ class ChatEngine:
         Returns:
             Generated response text
         """
+        language = self._detect_response_language(query)
         if intent == "smalltalk":
-            return self._build_smalltalk_response()
+            return self._build_smalltalk_response(language)
+
+        if answerability and answerability.status == "needs_clarification":
+            return self._build_clarification_response(language)
+
+        if answerability and answerability.status == "not_grounded":
+            return self._build_low_evidence_response(language)
 
         if not search_results:
             if intent == "mixed":
                 return (
-                    f"{self._build_smalltalk_response()} "
-                    "I couldn't find supporting information for the document part of your message in the files you uploaded yet. "
-                    "Please mention the document/topic you want me to inspect, or upload the relevant file."
+                    f"{self._build_smalltalk_response(language)} "
+                    f"{self._build_missing_support_for_mixed_response(language)}"
                 )
-            return (
-                "I couldn't find supporting information for that in your uploaded documents. "
-                "Please rephrase the question, mention the document/topic you want, or upload relevant files."
-            )
+            return self._build_not_grounded_response(language)
 
         # Build context from search results (without source numbers to avoid confusion)
         # Clean up the content - remove checkboxes and extra formatting
@@ -383,7 +441,7 @@ class ChatEngine:
         answer = re.sub(r"data/uploads/[^\s]+/", "", answer)
 
         if intent == "mixed":
-            answer = f"{self._build_smalltalk_response()} {answer}"
+            answer = f"{self._build_smalltalk_response(language)} {answer}"
 
         return answer.strip()
 
@@ -454,12 +512,127 @@ class ChatEngine:
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
-    def _build_smalltalk_response(self) -> str:
+    def _build_smalltalk_response(self, language: str) -> str:
         """Return a friendly conversational opener."""
+        if language == "fr":
+            return (
+                "Bonjour ! Je suis la pour repondre a des questions sur vos documents televerses. "
+                "Demandez-moi un fichier, un sujet, ou ajoutez des documents si vous voulez des reponses ancrees."
+            )
         return (
             "Bonjour! Hello! I'm here to help with questions about your uploaded documents. "
             "Ask about a file, a topic inside it, or upload documents if you want grounded answers."
         )
+
+    def _build_clarification_response(self, language: str) -> str:
+        """Ask the user to narrow an underspecified document request."""
+        if language == "fr":
+            return (
+                "J'ai besoin d'un peu plus de contexte avant de repondre a partir de vos documents. "
+                "Indiquez le document, la page, la section ou le sujet que vous voulez que j'examine."
+            )
+        return (
+            "I need a bit more context before I answer that from your documents. "
+            "Please mention the document, page, section, or topic you want me to look at."
+        )
+
+    def _build_missing_support_for_mixed_response(self, language: str) -> str:
+        """Return a localized mixed-intent fallback."""
+        if language == "fr":
+            return (
+                "Je n'ai pas encore trouve assez d'informations dans vos fichiers pour la partie documentaire de votre message. "
+                "Precisez le document ou le sujet que vous voulez que j'analyse, ou televersez le fichier concerne."
+            )
+        return (
+            "I couldn't find supporting information for the document part of your message in the files you uploaded yet. "
+            "Please mention the document/topic you want me to inspect, or upload the relevant file."
+        )
+
+    def _build_not_grounded_response(self, language: str) -> str:
+        """Return a localized no-support response."""
+        if language == "fr":
+            return (
+                "Je n'ai pas trouve d'informations suffisantes dans vos documents televerses pour repondre a cela. "
+                "Reformulez la question, mentionnez le document ou le sujet voulu, ou ajoutez les fichiers pertinents."
+            )
+        return (
+            "I couldn't find supporting information for that in your uploaded documents. "
+            "Please rephrase the question, mention the document/topic you want, or upload relevant files."
+        )
+
+    def _build_low_evidence_response(self, language: str) -> str:
+        """Return a localized weak-evidence refusal."""
+        if language == "fr":
+            return (
+                "Je n'ai pas assez d'elements fiables dans vos documents televerses pour repondre avec confiance. "
+                "Indiquez le document, la section ou le sujet que vous voulez que j'utilise."
+            )
+        return (
+            "I don't have enough grounded evidence in your uploaded documents to answer that confidently yet. "
+            "Please point me to the document, section, or topic you want me to use."
+        )
+
+    def _detect_response_language(self, query: str) -> str:
+        """Detect whether the guard responses should be in French or English."""
+        normalized = self._normalize_text(query)
+        tokens = set(normalized.split())
+        if any(token in FRENCH_LANGUAGE_HINTS for token in tokens):
+            return "fr"
+        return "en"
+
+    def _assess_answerability(
+        self,
+        query: str,
+        search_results: List[HybridSearchResult],
+        intent: str,
+    ) -> AnswerabilityDecision:
+        """Heuristically decide whether the retrieved evidence is strong enough to answer."""
+        if intent == "smalltalk":
+            return AnswerabilityDecision(status="answerable", reason="smalltalk", confidence=1.0)
+
+        normalized_query = self._normalize_text(query)
+        tokens = normalized_query.split()
+        has_document_hint = any(token in DOCUMENT_HINTS for token in tokens)
+        top_score = search_results[0].score if search_results else 0.0
+        avg_top_scores = (
+            sum(result.score for result in search_results[:3]) / min(len(search_results), 3)
+            if search_results
+            else 0.0
+        )
+
+        is_vague = any(pattern in normalized_query for pattern in VAGUE_QUERY_PATTERNS)
+        if is_vague and not has_document_hint:
+            return AnswerabilityDecision(
+                status="needs_clarification",
+                reason="underspecified_query",
+                confidence=0.9,
+            )
+
+        if not search_results:
+            return AnswerabilityDecision(status="not_grounded", reason="no_results", confidence=1.0)
+
+        if top_score < 0.015:
+            return AnswerabilityDecision(
+                status="not_grounded",
+                reason="very_low_retrieval_score",
+                confidence=0.95,
+            )
+
+        if len(search_results) == 1 and top_score < 0.03:
+            return AnswerabilityDecision(
+                status="needs_clarification",
+                reason="single_weak_result",
+                confidence=0.75,
+            )
+
+        if avg_top_scores < 0.02 and not has_document_hint:
+            return AnswerabilityDecision(
+                status="needs_clarification",
+                reason="weak_context_for_open_query",
+                confidence=0.7,
+            )
+
+        return AnswerabilityDecision(status="answerable", reason="sufficient_evidence", confidence=0.8)
 
     def _build_local_response(self, query: str, context: str, citations: List[Citation]) -> str:
         """Build a local deterministic response as fallback.
