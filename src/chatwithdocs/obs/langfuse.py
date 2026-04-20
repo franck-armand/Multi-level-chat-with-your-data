@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from typing import Dict, Optional
+    pass
 
 from chatwithdocs.config import settings
 
@@ -189,7 +189,6 @@ class LangfuseClient:
             return False
 
         try:
-            from langfuse import Langfuse
 
             langfuse = self._client
 
