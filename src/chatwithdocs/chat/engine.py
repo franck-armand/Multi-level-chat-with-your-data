@@ -12,6 +12,7 @@ from chatwithdocs.chat.models import Citation, MessageRole, Thread
 from chatwithdocs.config import settings
 from chatwithdocs.embedding import EmbeddingRouter
 from chatwithdocs.llm.client import LLMMessage, LLMRouter
+from chatwithdocs.obs.langfuse import langfuse_client
 from chatwithdocs.obs.sinks import JsonlTraceSink
 from chatwithdocs.obs.trace import Trace, TraceEvent, new_trace, trace_event
 from chatwithdocs.retrieval import HybridSearcher, get_reranker
@@ -29,8 +30,10 @@ SMALLTALK_ONLY_PATTERNS = {
     "good afternoon",
     "good evening",
     "how are you",
+    "how are you doing",
     "thanks",
     "thank you",
+    "thank you very much",
     "bonjour",
     "salut",
     "bonsoir",
@@ -40,6 +43,10 @@ SMALLTALK_ONLY_PATTERNS = {
     "merci",
     "merci beaucoup",
     "yo",
+    "greetings",
+    "good day",
+    "nice to meet you",
+    "pleased to meet you",
 }
 
 SMALLTALK_TOKENS = {
@@ -220,10 +227,15 @@ class ChatEngine:
 
         with trace_event(trace, "chat.intent.resolve", {"message_length": len(message)}):
             intent = await self._resolve_query_intent(message)
+        logger.debug(f"Intent resolved for query '{message[:30]}...': {intent}")
         self._record_trace_event(
             trace,
             "chat.intent.result",
-            {"intent": intent, "language": self._detect_response_language(message)},
+            {
+                "intent": intent,
+                "language": self._detect_response_language(message),
+                "query_preview": message[:50],
+            },
         )
         search_results = []
         if intent != "smalltalk":
@@ -300,6 +312,34 @@ class ChatEngine:
             },
         )
         self._write_chat_trace(trace)
+
+# Trace to Langfuse for observability with session support
+        if langfuse_client.enabled:
+            langfuse_metadata = {
+                "intent": intent,
+                "answerability_status": answerability.status,
+                "retrieved_chunks": len(search_results),
+                "citations": len(citations),
+            }
+            if search_results:
+                langfuse_metadata["top_retrieval_score"] = search_results[0].score if search_results else 0.0
+            try:
+                trace_url = langfuse_client.trace_generation(
+                    user_id=user_id,
+                    query=message,
+                    answer=response_content,
+                    thread_id=thread.id,
+                    metadata=langfuse_metadata,
+                )
+                logger.info(f"Langfuse trace: {trace_url}")
+            except Exception as e:
+                logger.error(f"Langfuse trace failed: {e}")
+            langfuse_client.trace_generation(
+                user_id=user_id,
+                query=message,
+                answer=response_content,
+                metadata=langfuse_metadata,
+            )
 
         # Add assistant message
         self.conversation_manager.add_assistant_message(thread.id, response_content, citations)
@@ -491,6 +531,11 @@ class ChatEngine:
         normalized = self._normalize_text(query)
         if not normalized:
             return "document_question"
+
+        # Case-insensitive check for exact smalltalk patterns
+        normalized_lower = query.strip().lower()
+        if normalized_lower in {p.lower() for p in SMALLTALK_ONLY_PATTERNS}:
+            return "smalltalk"
 
         if normalized in SMALLTALK_ONLY_PATTERNS:
             return "smalltalk"
@@ -712,7 +757,7 @@ class ChatEngine:
         )
 
         is_vague = any(pattern in normalized_query for pattern in VAGUE_QUERY_PATTERNS)
-        if is_vague and not has_document_hint:
+        if is_vague and not has_document_hint and len(search_results) < 2:
             return AnswerabilityDecision(
                 status="needs_clarification",
                 reason="underspecified_query",
@@ -722,28 +767,29 @@ class ChatEngine:
         if not search_results:
             return AnswerabilityDecision(status="not_grounded", reason="no_results", confidence=1.0)
 
-        if top_score < 0.015:
+        # Lower threshold - if we have any results, try to answer
+        if top_score < 0.005:
             return AnswerabilityDecision(
                 status="not_grounded",
                 reason="very_low_retrieval_score",
                 confidence=0.95,
             )
 
-        if len(search_results) == 1 and top_score < 0.03:
+        # Only ask for clarification if very weak evidence AND vague query
+        if len(search_results) == 1 and top_score < 0.01 and is_vague:
             return AnswerabilityDecision(
                 status="needs_clarification",
                 reason="single_weak_result",
                 confidence=0.75,
             )
 
-        if avg_top_scores < 0.02 and not has_document_hint:
-            return AnswerabilityDecision(
-                status="needs_clarification",
-                reason="weak_context_for_open_query",
-                confidence=0.7,
-            )
+        # If we have any results, assume answerable
+        if search_results:
+            return AnswerabilityDecision(status="answerable", reason="sufficient_evidence", confidence=0.8)
 
-        return AnswerabilityDecision(status="answerable", reason="sufficient_evidence", confidence=0.8)
+        return AnswerabilityDecision(
+            status="answerable", reason="sufficient_evidence", confidence=0.8
+        )
 
     def _build_local_response(self, query: str, context: str, citations: List[Citation]) -> str:
         """Build a local deterministic response as fallback.
