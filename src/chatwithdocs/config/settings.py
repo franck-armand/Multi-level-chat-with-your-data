@@ -171,6 +171,24 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1000, description="Maximum chunk size in characters")
     chunk_overlap: int = Field(default=200, description="Overlap between chunks in characters")
 
+    # Langfuse observability configuration
+    langfuse_enabled: bool = Field(
+        default=False,
+        description="Enable Langfuse tracing",
+    )
+    langfuse_secret_key: str | None = Field(
+        default=None,
+        description="Langfuse secret key",
+    )
+    langfuse_public_key: str | None = Field(
+        default=None,
+        description="Langfuse public key",
+    )
+    langfuse_base_url: str = Field(
+        default="http://localhost:3000",
+        description="Langfuse API base URL (self-hosted)",
+    )
+
     @field_validator("data_dir", "upload_dir", "vector_store_dir", "chat_trace_file", mode="before")
     @classmethod
     def ensure_path(cls, v: Any) -> Path:

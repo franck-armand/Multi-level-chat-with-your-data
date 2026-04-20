@@ -23,7 +23,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "python-multipart>=0.0.17",
     "python-jose[cryptography]>=3.3.0",
-    "passlib[bcrypt]>=1.7.0",
+    "passlib[bcrypt]>=1.7.4",
     # Data validation and settings
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
@@ -45,6 +45,8 @@ dependencies = [
     "aiohttp>=3.13.3",
     # Agent/Graph workflows
     "langgraph>=0.2.0",
+    # Observability - Langfuse
+    "langfuse>=2.0.0",
 ]
 
 [project.optional-dependencies]
