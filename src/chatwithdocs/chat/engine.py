@@ -750,11 +750,6 @@ class ChatEngine:
         tokens = normalized_query.split()
         has_document_hint = any(token in DOCUMENT_HINTS for token in tokens)
         top_score = search_results[0].score if search_results else 0.0
-        avg_top_scores = (
-            sum(result.score for result in search_results[:3]) / min(len(search_results), 3)
-            if search_results
-            else 0.0
-        )
 
         is_vague = any(pattern in normalized_query for pattern in VAGUE_QUERY_PATTERNS)
         if is_vague and not has_document_hint and len(search_results) < 2:
