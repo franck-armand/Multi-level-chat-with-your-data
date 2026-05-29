@@ -285,4 +285,3 @@ class SecureTempFile:
                 self.temp_path.unlink()
             except Exception as e:
                 logger.error(f"Failed to securely delete temp file: {e}")
-

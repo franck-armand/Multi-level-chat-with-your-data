@@ -23,10 +23,14 @@ class ConversationExporter:
         """
         md = f"# Conversation: {thread.title or 'Untitled'}\n\n"
         md += f"*Thread ID: {thread.id}*  \n"
-        md += f"*Created: {thread.created_at.isoformat() if thread.created_at else 'Unknown'}*  \n\n"
+        md += (
+            f"*Created: {thread.created_at.isoformat() if thread.created_at else 'Unknown'}*  \n\n"
+        )
 
         for msg in thread.messages:
-            timestamp = msg.timestamp.strftime("%Y-%m-%d %H:%M:%S") if hasattr(msg, "timestamp") else ""
+            timestamp = (
+                msg.timestamp.strftime("%Y-%m-%d %H:%M:%S") if hasattr(msg, "timestamp") else ""
+            )
 
             if msg.role.value == "user":
                 md += f"## User ({timestamp})\n\n"
@@ -65,11 +69,17 @@ class ConversationExporter:
             from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
             pdf_buffer = BytesIO()
-            doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, rightMargin=0.5 * inch, leftMargin=0.5 * inch)
+            doc = SimpleDocTemplate(
+                pdf_buffer, pagesize=letter, rightMargin=0.5 * inch, leftMargin=0.5 * inch
+            )
 
             styles = getSampleStyleSheet()
             title_style = ParagraphStyle(
-                "CustomTitle", parent=styles["Heading1"], fontSize=16, textColor="black", spaceAfter=6
+                "CustomTitle",
+                parent=styles["Heading1"],
+                fontSize=16,
+                textColor="black",
+                spaceAfter=6,
             )
 
             user_style = ParagraphStyle(
@@ -77,11 +87,20 @@ class ConversationExporter:
             )
 
             assistant_style = ParagraphStyle(
-                "AssistantMessage", parent=styles["Normal"], fontSize=10, textColor="darkgreen", spaceAfter=12
+                "AssistantMessage",
+                parent=styles["Normal"],
+                fontSize=10,
+                textColor="darkgreen",
+                spaceAfter=12,
             )
 
             source_style = ParagraphStyle(
-                "Source", parent=styles["Normal"], fontSize=8, textColor="gray", spaceAfter=6, leftIndent=20
+                "Source",
+                parent=styles["Normal"],
+                fontSize=8,
+                textColor="gray",
+                spaceAfter=6,
+                leftIndent=20,
             )
 
             story = []
@@ -89,9 +108,7 @@ class ConversationExporter:
             # Add title
             title = thread.title or "Untitled Conversation"
             story.append(Paragraph(title, title_style))
-            story.append(
-                Paragraph(f"<i>Thread ID: {thread.id}</i>", source_style)
-            )
+            story.append(Paragraph(f"<i>Thread ID: {thread.id}</i>", source_style))
             story.append(Spacer(1, 0.2 * inch))
 
             # Add messages
@@ -103,14 +120,10 @@ class ConversationExporter:
                 )
 
                 if msg.role.value == "user":
-                    story.append(
-                        Paragraph(f"<b>User ({timestamp})</b>", user_style)
-                    )
+                    story.append(Paragraph(f"<b>User ({timestamp})</b>", user_style))
                     story.append(Paragraph(msg.content, user_style))
                 else:
-                    story.append(
-                        Paragraph(f"<b>Assistant ({timestamp})</b>", assistant_style)
-                    )
+                    story.append(Paragraph(f"<b>Assistant ({timestamp})</b>", assistant_style))
                     story.append(Paragraph(msg.content, assistant_style))
 
                     # Add citations

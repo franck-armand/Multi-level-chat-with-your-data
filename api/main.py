@@ -194,7 +194,6 @@ async def chat(request: ChatRequest, user_id: str = Depends(get_current_user_id)
             )
 
     try:
-
         response = await chat_engine.chat(
             user_id=user_id,
             thread_id=request.thread_id,
@@ -326,7 +325,6 @@ async def get_conversation(thread_id: str, user_id: str = Depends(get_current_us
         )
 
     try:
-
         history = await chat_engine.get_thread_history(thread_id, user_id)
 
         if not history:

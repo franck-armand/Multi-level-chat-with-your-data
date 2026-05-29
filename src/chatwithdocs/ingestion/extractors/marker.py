@@ -48,9 +48,7 @@ class MarkerPDFExtractor(Extractor):
             from marker.converters.pdf import PdfConverter
             from marker.models import create_model_dict
         except ImportError:
-            logger.warning(
-                "marker-pdf not installed. Install with: uv pip install marker-pdf"
-            )
+            logger.warning("marker-pdf not installed. Install with: uv pip install marker-pdf")
             return self._fallback_extractor.extract(file_path)
 
         chunks: list[Chunk] = []
@@ -106,20 +104,14 @@ class MarkerPDFExtractor(Extractor):
                     )
                     chunks.append(chunk)
                 elif block_type in ("text", "caption", "formula", "code"):
-                    text_chunks = self._chunk_text(
-                        content, file_path, page_num, block_type
-                    )
+                    text_chunks = self._chunk_text(content, file_path, page_num, block_type)
                     chunks.extend(text_chunks)
                 else:
-                    text_chunks = self._chunk_text(
-                        content, file_path, page_num, "text"
-                    )
+                    text_chunks = self._chunk_text(content, file_path, page_num, "text")
                     chunks.extend(text_chunks)
 
             metadata = {
-                "page_count": max(
-                    (getattr(block, "page_num", 1) or 1) for block in blocks
-                )
+                "page_count": max((getattr(block, "page_num", 1) or 1) for block in blocks)
                 if blocks
                 else 0,
                 "extractor": "marker-pdf",

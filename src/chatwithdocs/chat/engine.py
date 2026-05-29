@@ -341,7 +341,9 @@ class ChatEngine:
                 "confidence_factors": {k: round(v, 3) for k, v in confidence.factors.items()},
             }
             if search_results:
-                langfuse_metadata["top_retrieval_score"] = search_results[0].score if search_results else 0.0
+                langfuse_metadata["top_retrieval_score"] = (
+                    search_results[0].score if search_results else 0.0
+                )
             try:
                 trace_url = langfuse_client.trace_generation(
                     user_id=user_id,
@@ -798,7 +800,9 @@ class ChatEngine:
 
         # If we have any results, assume answerable
         if search_results:
-            return AnswerabilityDecision(status="answerable", reason="sufficient_evidence", confidence=0.8)
+            return AnswerabilityDecision(
+                status="answerable", reason="sufficient_evidence", confidence=0.8
+            )
 
         return AnswerabilityDecision(
             status="answerable", reason="sufficient_evidence", confidence=0.8

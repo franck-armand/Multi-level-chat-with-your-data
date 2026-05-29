@@ -81,7 +81,9 @@ def check_oracle_numeric(
         a = float(assistant_value)
         o = float(oracle_value)
     except Exception:
-        return CheckResult(False, f"could not cast to float: assistant={assistant_value}, oracle={oracle_value}")
+        return CheckResult(
+            False, f"could not cast to float: assistant={assistant_value}, oracle={oracle_value}"
+        )
 
     if abs(a - o) <= float(tolerance):
         return CheckResult(True)

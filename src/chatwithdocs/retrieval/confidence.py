@@ -193,7 +193,9 @@ class ConfidenceScorer:
 
     def _build_reasoning(self, factors: dict[str, float], overall_score: float) -> str:
         """Build human-readable reasoning for score."""
-        score_band = "high" if overall_score > 0.75 else "moderate" if overall_score > 0.5 else "low"
+        score_band = (
+            "high" if overall_score > 0.75 else "moderate" if overall_score > 0.5 else "low"
+        )
 
         retrieval = factors.get("retrieval_quality", 0)
         agreement = factors.get("result_agreement", 0)

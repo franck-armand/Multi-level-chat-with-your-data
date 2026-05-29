@@ -392,9 +392,11 @@ with st.sidebar:
                 selected_model = st.selectbox(
                     "Choose Model",
                     all_options,
-                    format_func=lambda x: f"[INSTALLED] {x}"
-                    if x in [m.replace(":latest", "") for m in ollama_models]
-                    else f"[DOWNLOAD] {x} (not installed)",
+                    format_func=lambda x: (
+                        f"[INSTALLED] {x}"
+                        if x in [m.replace(":latest", "") for m in ollama_models]
+                        else f"[DOWNLOAD] {x} (not installed)"
+                    ),
                     help="Select a model. [INSTALLED] = installed, [DOWNLOAD] = needs download",
                     key="ollama_model_select",
                 )
@@ -603,6 +605,7 @@ with st.sidebar:
                 thread_for_export = conversation_manager.get_thread(conv["id"])
                 if thread_for_export:
                     from chatwithdocs.chat.exporter import ConversationExporter
+
                     md_content = ConversationExporter().to_markdown(thread_for_export)
                     safe_title = (conv["title"] or "conversation").replace(" ", "_")
                     st.download_button(

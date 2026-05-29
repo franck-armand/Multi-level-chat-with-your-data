@@ -53,7 +53,7 @@ class QueryValidator:
                 return False, f"Query contains suspicious pattern: '{pattern}'"
 
         # Check for excessive special characters (potential injection)
-        special_chars = sum(1 for c in query if c in '{}[]<>\\"|\'~`')
+        special_chars = sum(1 for c in query if c in "{}[]<>\\\"|'~`")
         if special_chars > 20:
             return False, "Query contains too many special characters"
 

@@ -35,7 +35,9 @@ class TestChatEngineResponseGuards:
         thread = Thread(user_id="user1")
 
         response = asyncio.run(
-            engine._generate_response("Bonjour", [], [], thread, intent=engine._classify_query_intent("Bonjour"))
+            engine._generate_response(
+                "Bonjour", [], [], thread, intent=engine._classify_query_intent("Bonjour")
+            )
         )
 
         assert "Bonjour !" in response
@@ -127,7 +129,9 @@ class TestChatEngineResponseGuards:
             )
         ]
 
-        decision = engine._assess_answerability("What does the contract say?", results, "document_question")
+        decision = engine._assess_answerability(
+            "What does the contract say?", results, "document_question"
+        )
 
         assert decision.status == "not_grounded"
         assert decision.reason == "very_low_retrieval_score"
@@ -139,17 +143,23 @@ class TestChatEngineResponseGuards:
                 id="chunk-1",
                 content="The contract allows termination with 30 days notice.",
                 score=0.08,
-                metadata=ChunkMetadata(source_file="contract.txt", file_type="txt", user_id="user1"),
+                metadata=ChunkMetadata(
+                    source_file="contract.txt", file_type="txt", user_id="user1"
+                ),
             ),
             HybridSearchResult(
                 id="chunk-2",
                 content="Termination requires written notice.",
                 score=0.06,
-                metadata=ChunkMetadata(source_file="contract.txt", file_type="txt", user_id="user1"),
+                metadata=ChunkMetadata(
+                    source_file="contract.txt", file_type="txt", user_id="user1"
+                ),
             ),
         ]
 
-        decision = engine._assess_answerability("What does the contract say?", results, "document_question")
+        decision = engine._assess_answerability(
+            "What does the contract say?", results, "document_question"
+        )
 
         assert decision.status == "answerable"
 
@@ -223,16 +233,22 @@ class TestChatEngineResponseGuards:
                 id="chunk-1",
                 content="The contract allows termination with 30 days notice.",
                 score=0.08,
-                metadata=ChunkMetadata(source_file="contract.txt", file_type="txt", user_id="user1"),
+                metadata=ChunkMetadata(
+                    source_file="contract.txt", file_type="txt", user_id="user1"
+                ),
             ),
             HybridSearchResult(
                 id="chunk-2",
                 content="Termination requires written notice.",
                 score=0.06,
-                metadata=ChunkMetadata(source_file="contract.txt", file_type="txt", user_id="user1"),
+                metadata=ChunkMetadata(
+                    source_file="contract.txt", file_type="txt", user_id="user1"
+                ),
             ),
         ]
-        decision = engine._assess_answerability("What does the contract say?", results, "document_question")
+        decision = engine._assess_answerability(
+            "What does the contract say?", results, "document_question"
+        )
 
         trace_data = engine._build_answerability_trace_data(
             "What does the contract say?", results, "document_question", decision

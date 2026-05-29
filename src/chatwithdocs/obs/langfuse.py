@@ -189,7 +189,6 @@ class LangfuseClient:
             return False
 
         try:
-
             langfuse = self._client
 
             langfuse.score(

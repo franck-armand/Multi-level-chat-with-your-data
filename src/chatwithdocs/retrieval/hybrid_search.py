@@ -132,7 +132,9 @@ class BM25Index:
     def delete(self, filter_dict: Dict[str, Any]) -> int:
         """Delete indexed documents matching a metadata filter."""
         keep_indices = [
-            idx for idx, metadata in enumerate(self._metadata) if not self._matches_filter(metadata, filter_dict)
+            idx
+            for idx, metadata in enumerate(self._metadata)
+            if not self._matches_filter(metadata, filter_dict)
         ]
         deleted = len(self._metadata) - len(keep_indices)
         if deleted == 0:

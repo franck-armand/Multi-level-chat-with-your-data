@@ -68,7 +68,6 @@ class Trace:
         }
 
 
-
 def new_trace(meta: Optional[Dict[str, Any]] = None) -> Trace:
     return Trace(
         trace_id=str(uuid.uuid4()),
