@@ -5,6 +5,8 @@
 [![Tests](https://img.shields.io/badge/tests-36%20passing-brightgreen.svg)]()
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
+> **Repo:** `https://github.com/franck-armand/Multi-level-chat-with-your-data` — replace this URL with your fork if you've renamed the repository.
+
 > **Chat with your documents using AI. Upload PDFs, Word docs, CSVs, and text files, then ask questions in natural language.**
 
 ChatWithDocs is a production-ready RAG (Retrieval-Augmented Generation) system that brings the power of AI to your documents. Whether you're analyzing research papers, reviewing contracts, or exploring datasets, simply upload your files and start a conversation.
@@ -65,7 +67,7 @@ ChatWithDocs is a production-ready RAG (Retrieval-Augmented Generation) system t
 For free, privacy-focused AI running entirely on your machine:
 
 ```bash
-# Clone the repository
+# Clone the repository (replace URL with your fork if renamed)
 git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
 cd Multi-level-chat-with-your-data
 
@@ -89,7 +91,7 @@ open http://localhost:8501  # macOS
 For users with OpenAI, DeepSeek, or Kimi API keys:
 
 ```bash
-# Clone the repository
+# Clone the repository (same URL as above — update if repo was renamed)
 git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
 cd Multi-level-chat-with-your-data
 
@@ -327,7 +329,7 @@ docker-compose up -d
 ### Option 2: Local Installation (Development)
 
 ```bash
-# Clone and install
+# Clone and install (update URL if repo was renamed)
 git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
 cd Multi-level-chat-with-your-data
 
@@ -346,7 +348,7 @@ export LLM_PROVIDER=ollama
 export OLLAMA_MODEL=llama3.2
 
 # Start the web interface
-uv run streamlit run app/streamlit_app_v2.py
+uv run streamlit run app/streamlit_app.py
 ```
 
 ### Option 3: Command Line Only
@@ -375,7 +377,7 @@ chatwithdocs server --api
 ### Step-by-Step Installation
 
 ```bash
-# 1. Clone the repository
+# 1. Clone the repository (update URL if repo was renamed)
 git clone https://github.com/franck-armand/Multi-level-chat-with-your-data.git
 cd Multi-level-chat-with-your-data
 
@@ -415,7 +417,7 @@ The Streamlit-based web interface provides the most user-friendly experience:
 chatwithdocs server --ui --port 8501
 
 # Or with uv
-uv run streamlit run app/streamlit_app_v2.py
+uv run streamlit run app/streamlit_app.py
 ```
 
 **Features:**
@@ -442,7 +444,7 @@ chatwithdocs chat "What are the key terms?" --user legal-team
 chatwithdocs chat --interactive  # Interactive mode
 
 # Manage conversations
-chatwithdocs conversations                    # List all
+chatwithdocs conversations  # List all
 chatwithdocs conversations --delete <thread-id>  # Delete one
 
 # Configure AI
@@ -471,7 +473,10 @@ uv run uvicorn api.main:app --reload --port 8000
 |--------|----------|-------------|
 | `POST` | `/api/chat` | Send chat message |
 | `POST` | `/api/upload` | Upload document |
-| `GET` | `/api/conversations/{user_id}` | List conversations |
+| `GET` | `/api/conversations` | List conversations (requires `X-User-Id` header) |
+| `GET` | `/api/conversations/{thread_id}` | Get conversation history |
+| `DELETE` | `/api/conversations/{thread_id}` | Delete a conversation |
+| `GET` | `/api/export/conversation/{thread_id}` | Export as markdown or PDF |
 | `GET` | `/api/health` | Health check |
 
 **Example API Usage:**
@@ -480,16 +485,22 @@ uv run uvicorn api.main:app --reload --port 8000
 # Chat via API
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
-  -d '{
-    "message": "Summarize the document",
-    "user_id": "user_123",
-    "thread_id": null
-  }'
+  -H "X-User-Id: user_123" \
+  -d '{"message": "Summarize the document", "thread_id": null}'
 
 # Upload via API
 curl -X POST http://localhost:8000/api/upload \
-  -F "file=@document.pdf" \
-  -F "user_id=user_123"
+  -H "X-User-Id: user_123" \
+  -F "file=@document.pdf"
+
+# Export conversation as markdown
+curl -H "X-User-Id: user_123" \
+  "http://localhost:8000/api/export/conversation/<thread_id>?format=markdown"
+
+# Export conversation as PDF
+curl -H "X-User-Id: user_123" \
+  "http://localhost:8000/api/export/conversation/<thread_id>?format=pdf" \
+  -o conversation.pdf
 ```
 
 ---
@@ -670,29 +681,6 @@ uv run ruff check --fix .
 uv run ruff format .
 ```
 
-### Project Structure
-
-```
-chatwithdocs/
-├── src/chatwithdocs/          # Main package
-│   ├── chat/                  # Chat system (models, engine, persistence)
-│   ├── config/                # Configuration management
-│   ├── embedding/             # Embedding providers (OpenAI, local)
-│   ├── ingestion/             # File processing pipeline
-│   ├── llm/                   # LLM clients (Ollama, OpenAI, etc.)
-│   ├── retrieval/             # Search (hybrid, reranker, citations)
-│   ├── security/              # Security (injection, PII, sandbox)
-│   └── storage/               # Vector and data storage
-├── app/
-│   └── streamlit_app_v2.py    # Web interface
-├── api/
-│   └── main.py                # FastAPI server
-├── tests/                     # Test suite (36 tests)
-├── Dockerfile                 # Docker image
-├── docker-compose.yml         # Docker orchestration
-└── README.md                  # This file
-```
-
 ### Running Tests
 
 ```bash
@@ -750,7 +738,7 @@ chmod 755 data/
 
 ### Getting Help
 
-- **Issues**: Report bugs at https://github.com/franck-armand/Multi-level-chat-with-your-data/issues
+- **Issues**: Report bugs at the repository URL above + `/issues` (update if repo was renamed)
 - **Documentation**: This README and inline code docs
 - **CLI Help**: `chatwithdocs --help` or `chatwithdocs <command> --help`
 
