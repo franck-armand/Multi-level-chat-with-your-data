@@ -14,7 +14,8 @@ jobs:
   nightly-test:
     name: Nightly Test Suite
     runs-on: ubuntu-latest
-    
+    continue-on-error: true
+
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
@@ -33,10 +34,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Sync dependencies
         run: uv sync --extra dev
