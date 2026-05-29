@@ -124,7 +124,7 @@ class TestChatEngineResponseGuards:
             HybridSearchResult(
                 id="chunk-1",
                 content="thin evidence",
-                score=0.01,
+                score=0.004,
                 metadata=ChunkMetadata(source_file="doc.txt", file_type="txt", user_id="user1"),
             )
         ]
