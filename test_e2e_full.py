@@ -2,7 +2,7 @@
 """End-to-end integration test for ChatWithDocs RAG system.
 
 This script tests the complete flow:
-1. File ingestion (upload → extract → embed → store)
+1. File ingestion (upload -> extract -> embed -> store)
 2. Chat with retrieval and citations
 
 Usage:
@@ -46,7 +46,7 @@ For questions about benefits, contact HR at hr@acmecorp.com
 For IT support, email support@acmecorp.com or call (555) 123-4567
 """
         test_file.write_text(test_content)
-        print(f"\n✓ Created test document: {test_file}")
+        print(f"\n- Created test document: {test_file}")
 
         # Test 1: Ingestion Pipeline
         print("\n" + "=" * 60)
@@ -59,11 +59,11 @@ For IT support, email support@acmecorp.com or call (555) 123-4567
         result = await pipeline.ingest_file(test_file, user_id="test_user")
 
         if result["success"]:
-            print("✓ File ingested successfully")
-            print(f"✓ Chunks indexed: {result['chunks_indexed']}")
-            print(f"✓ File path: {result['file_path']}")
+            print("- File ingested successfully")
+            print(f"- Chunks indexed: {result['chunks_indexed']}")
+            print(f"- File path: {result['file_path']}")
         else:
-            print(f"✗ Ingestion failed: {result['error']}")
+            print(f"x Ingestion failed: {result['error']}")
             return False
 
         # Test 2: Chat Engine
@@ -82,11 +82,11 @@ For IT support, email support@acmecorp.com or call (555) 123-4567
             message="Who founded Acme Corp and when?",
         )
 
-        print("✓ Chat response received")
-        print(f"✓ Thread ID: {response['thread_id']}")
-        print(f"✓ Response: {response['content'][:200]}...")
-        print(f"✓ Sources: {response['sources']}")
-        print(f"✓ Citations: {len(response['citations'])}")
+        print("- Chat response received")
+        print(f"- Thread ID: {response['thread_id']}")
+        print(f"- Response: {response['content'][:200]}...")
+        print(f"- Sources: {response['sources']}")
+        print(f"- Citations: {len(response['citations'])}")
 
         # Test 3: Follow-up question
         print("\n" + "=" * 60)
@@ -99,10 +99,10 @@ For IT support, email support@acmecorp.com or call (555) 123-4567
             message="What benefits do employees get?",
         )
 
-        print("✓ Follow-up response received")
-        print(f"✓ Same thread: {response2['thread_id'] == response['thread_id']}")
-        print(f"✓ Response: {response2['content'][:200]}...")
-        print(f"✓ Citations: {len(response2['citations'])}")
+        print("- Follow-up response received")
+        print(f"- Same thread: {response2['thread_id'] == response['thread_id']}")
+        print(f"- Response: {response2['content'][:200]}...")
+        print(f"- Citations: {len(response2['citations'])}")
 
         # Test 4: Query with no results
         print("\n" + "=" * 60)
@@ -115,8 +115,8 @@ For IT support, email support@acmecorp.com or call (555) 123-4567
             message="What is the weather like today?",
         )
 
-        print("✓ Response for no-match query")
-        print(f"✓ Response: {response3['content'][:100]}...")
+        print("- Response for no-match query")
+        print(f"- Response: {response3['content'][:100]}...")
 
     return True
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     if success:
         print("\n" + "=" * 60)
-        print("ALL END-TO-END TESTS PASSED ✓")
+        print("ALL END-TO-END TESTS PASSED -")
         print("=" * 60)
         print("\nThe Edan-V2 RAG system is fully operational!")
         print("\nYou can now:")
@@ -135,5 +135,5 @@ if __name__ == "__main__":
         print("2. Upload documents through the web interface")
         print("3. Chat with AI that retrieves from your documents")
     else:
-        print("\n✗ Tests failed")
+        print("\nx Tests failed")
         exit(1)
