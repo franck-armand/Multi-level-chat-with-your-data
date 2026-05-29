@@ -17,7 +17,9 @@ from chatwithdocs.obs.sinks import JsonlTraceSink
 from chatwithdocs.obs.trace import Trace, TraceEvent, new_trace, trace_event
 from chatwithdocs.retrieval import HybridSearcher, get_reranker
 from chatwithdocs.retrieval.citation import CitationBuilder
+from chatwithdocs.retrieval.confidence import ConfidenceScorer
 from chatwithdocs.retrieval.hybrid_search import HybridSearchResult
+from chatwithdocs.retrieval.query_validator import QueryValidator
 from chatwithdocs.storage.vectors import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
@@ -196,6 +198,8 @@ class ChatEngine:
         self.hybrid_searcher = HybridSearcher(self.vector_store, self.embedder)
         self.reranker = get_reranker()
         self.citation_builder = CitationBuilder()
+        self.confidence_scorer = ConfidenceScorer()
+        self.query_validator = QueryValidator()
 
     async def chat(
         self,
@@ -213,6 +217,11 @@ class ChatEngine:
         Returns:
             Response dictionary with content and citations
         """
+        # Validate query
+        is_valid, error = self.query_validator.validate(message)
+        if not is_valid:
+            raise ValueError(error)
+
         # Get or create thread
         if thread_id:
             thread = self.conversation_manager.get_thread(thread_id)
@@ -313,13 +322,23 @@ class ChatEngine:
         )
         self._write_chat_trace(trace)
 
-# Trace to Langfuse for observability with session support
+        # Calculate confidence score
+        confidence = self.confidence_scorer.score(
+            query=message,
+            retrieval_results=search_results,
+            response=response_content,
+            intent=intent,
+        )
+
+        # Trace to Langfuse for observability with session support
         if langfuse_client.enabled:
             langfuse_metadata = {
                 "intent": intent,
                 "answerability_status": answerability.status,
                 "retrieved_chunks": len(search_results),
                 "citations": len(citations),
+                "confidence_score": round(confidence.score, 3),
+                "confidence_factors": {k: round(v, 3) for k, v in confidence.factors.items()},
             }
             if search_results:
                 langfuse_metadata["top_retrieval_score"] = search_results[0].score if search_results else 0.0
@@ -334,12 +353,6 @@ class ChatEngine:
                 logger.info(f"Langfuse trace: {trace_url}")
             except Exception as e:
                 logger.error(f"Langfuse trace failed: {e}")
-            langfuse_client.trace_generation(
-                user_id=user_id,
-                query=message,
-                answer=response_content,
-                metadata=langfuse_metadata,
-            )
 
         # Add assistant message
         self.conversation_manager.add_assistant_message(thread.id, response_content, citations)
@@ -353,6 +366,11 @@ class ChatEngine:
             "content": response_content,
             "citations": [c.to_dict() for c in citations],
             "sources": list(set(c.source_file for c in citations)),
+            "confidence": {
+                "score": round(confidence.score, 3),
+                "factors": {k: round(v, 3) for k, v in confidence.factors.items()},
+                "reasoning": confidence.reasoning,
+            },
         }
 
     async def _auto_generate_title(self, thread: Thread, first_message: str) -> None:
