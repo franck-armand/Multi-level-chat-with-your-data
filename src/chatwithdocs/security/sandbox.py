@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -285,6 +286,3 @@ class SecureTempFile:
             except Exception as e:
                 logger.error(f"Failed to securely delete temp file: {e}")
 
-
-# Import at module level to avoid circular import
-import os

@@ -27,7 +27,7 @@ print("=" * 70)
 print("\n" + "=" * 60)
 print("TEST 1: Configuration System")
 print("=" * 60)
-from chatwithdocs.config import settings, EmbeddingProvider
+from chatwithdocs.config import settings, EmbeddingProvider  # noqa: E402
 
 print(f"✓ App name: {settings.app_name}")
 print(f"✓ Version: {settings.app_version}")
@@ -39,7 +39,7 @@ print(f"✓ Max file size: {settings.max_file_size_mb}MB")
 print("\n" + "=" * 60)
 print("TEST 2: Security - Prompt Injection Detection")
 print("=" * 60)
-from chatwithdocs.security import PromptInjectionDetector
+from chatwithdocs.security import PromptInjectionDetector  # noqa: E402
 
 detector = PromptInjectionDetector(enabled=True)
 
@@ -56,7 +56,7 @@ print(f"  Patterns matched: {len(injection_result.patterns_matched)}")
 print("\n" + "=" * 60)
 print("TEST 3: Security - PII Detection & Redaction")
 print("=" * 60)
-from chatwithdocs.security import PIIDetector
+from chatwithdocs.security import PIIDetector  # noqa: E402
 
 pii_detector = PIIDetector(enabled=True)
 text_with_pii = "Contact me at john@example.com or call 555-123-4567"
@@ -70,7 +70,7 @@ print(f"✓ Redacted: {redacted}")
 print("\n" + "=" * 60)
 print("TEST 4: Chat Models")
 print("=" * 60)
-from chatwithdocs.chat import Thread, Message, MessageRole, Citation
+from chatwithdocs.chat import Thread, Message, MessageRole, Citation  # noqa: E402
 
 thread = Thread(user_id="demo_user", title="Demo Chat")
 msg1 = Message(role=MessageRole.USER, content="Hello!")
@@ -91,7 +91,7 @@ print(f"✓ Citations: {len(thread.messages[1].citations)}")
 print("\n" + "=" * 60)
 print("TEST 5: Chat Persistence (SQLite)")
 print("=" * 60)
-from chatwithdocs.chat.persistence import ChatPersistence
+from chatwithdocs.chat.persistence import ChatPersistence  # noqa: E402
 
 with tempfile.TemporaryDirectory() as tmpdir:
     db_path = Path(tmpdir) / "demo.db"
@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 print("\n" + "=" * 60)
 print("TEST 6: Audit Logging")
 print("=" * 60)
-from chatwithdocs.security import audit_logger
+from chatwithdocs.security import audit_logger  # noqa: E402
 
 audit_logger.log_query(user_id="demo_user", thread_id=thread.id, query="Test query", success=True)
 print("✓ Audit event logged")
@@ -125,7 +125,7 @@ print(f"✓ Log file: {audit_logger._log_file}")
 print("\n" + "=" * 60)
 print("TEST 7: File Sandbox")
 print("=" * 60)
-from chatwithdocs.security import FileSandbox
+from chatwithdocs.security import FileSandbox  # noqa: E402
 
 with tempfile.TemporaryDirectory() as tmpdir:
     # Create a test file
@@ -144,7 +144,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 print("\n" + "=" * 60)
 print("TEST 8: Embedding Router (Local)")
 print("=" * 60)
-from chatwithdocs.embedding import EmbeddingRouter
+from chatwithdocs.embedding import EmbeddingRouter  # noqa: E402
 
 
 async def test_embedding():
@@ -163,8 +163,8 @@ asyncio.run(test_embedding())
 print("\n" + "=" * 60)
 print("TEST 9: Citation Builder")
 print("=" * 60)
-from chatwithdocs.retrieval import CitationBuilder
-from chatwithdocs.storage.vectors import ChunkMetadata
+from chatwithdocs.retrieval import CitationBuilder  # noqa: E402
+from chatwithdocs.storage.vectors import ChunkMetadata  # noqa: E402
 
 builder = CitationBuilder()
 citation = builder.build_citation(
