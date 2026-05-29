@@ -17,7 +17,8 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+from io import BytesIO
 from pydantic import BaseModel
 
 from chatwithdocs.chat.engine import ChatEngine
@@ -130,15 +131,38 @@ def get_current_user_id(x_user_id: str | None = Header(default=None, alias="X-Us
 # Health check endpoint
 @app.get("/api/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint with component diagnostics."""
+    checks = {
+        "chat_engine": "ok" if chat_engine is not None else "not_initialized",
+        "ingestion": "ok" if ingestion_pipeline is not None else "not_initialized",
+        "vector_store": "ok",
+        "database": "ok",
+    }
+
+    # Check LLM connectivity
+    try:
+        if chat_engine:
+            # Quick test of LLM
+            await chat_engine.hybrid_searcher.embedder.embed("test")
+            checks["llm"] = "ok"
+    except Exception as e:
+        checks["llm"] = f"error: {str(e)[:50]}"
+
+    # Check vector store connectivity
+    try:
+        if chat_engine:
+            await chat_engine.vector_store.search("test", 1)
+            checks["vector_store"] = "ok"
+    except Exception as e:
+        checks["vector_store"] = f"error: {str(e)[:50]}"
+
+    # Determine overall status
+    all_ok = all(v == "ok" for v in checks.values())
+
     return {
-        "status": "healthy",
+        "status": "healthy" if all_ok else "degraded",
         "version": settings.app_version,
-        "services": {
-            "chat_engine": chat_engine is not None,
-            "vector_store": True,
-            "ingestion": ingestion_pipeline is not None,
-        },
+        "checks": checks,
     }
 
 
@@ -362,9 +386,74 @@ async def delete_conversation(thread_id: str, user_id: str = Depends(get_current
         )
 
 
+# Export endpoints
+@app.get("/api/export/conversation/{thread_id}", tags=["Export"])
+async def export_conversation(
+    thread_id: str, format: str = "markdown", user_id: str = Depends(get_current_user_id)
+):
+    """Export a conversation to markdown or PDF.
+
+    Args:
+        thread_id: Thread ID to export
+        format: Export format (markdown or pdf)
+        user_id: User ID (from header)
+
+    Returns:
+        Markdown string or PDF bytes
+    """
+    if not conversation_manager:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Conversation manager not initialized",
+        )
+
+    try:
+        from chatwithdocs.chat.exporter import ConversationExporter
+
+        thread = conversation_manager.get_thread(thread_id)
+        if not thread or thread.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
+            )
+
+        exporter = ConversationExporter()
+
+        if format == "markdown":
+            md_content = exporter.to_markdown(thread)
+            return {
+                "format": "markdown",
+                "content": md_content,
+                "filename": f"{thread.title or 'conversation'}_{thread_id}.md",
+            }
+
+        elif format == "pdf":
+            pdf_bytes = await exporter.to_pdf(thread)
+            filename = f"{thread.title or 'conversation'}_{thread_id}.pdf"
+            return StreamingResponse(
+                BytesIO(pdf_bytes),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported format: {format}. Use 'markdown' or 'pdf'",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Export error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Export failed: {str(e)}",
+        )
+
+
 # Error handlers
 @app.exception_handler(Exception)
-async def generic_exception_handler(request, exc):
+async def generic_exception_handler(_request, exc):
     """Handle generic exceptions."""
     logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(

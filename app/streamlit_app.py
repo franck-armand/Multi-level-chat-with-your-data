@@ -586,7 +586,7 @@ with st.sidebar:
 
     if conversations:
         for conv in conversations:
-            col1, col2 = st.columns([4, 1])
+            col1, col2, col3 = st.columns([4, 1, 1])
             with col1:
                 title = conv["title"] or "Untitled Chat"
                 if st.button(
@@ -600,6 +600,20 @@ with st.sidebar:
                     st.session_state.current_thread_id = conv["id"]
                     st.rerun()
             with col2:
+                thread_for_export = conversation_manager.get_thread(conv["id"])
+                if thread_for_export:
+                    from chatwithdocs.chat.exporter import ConversationExporter
+                    md_content = ConversationExporter().to_markdown(thread_for_export)
+                    safe_title = (conv["title"] or "conversation").replace(" ", "_")
+                    st.download_button(
+                        "↓",
+                        data=md_content,
+                        file_name=f"{safe_title}_{conv['id'][:8]}.md",
+                        mime="text/markdown",
+                        key=f"exp_{conv['id']}",
+                        help="Export conversation as Markdown",
+                    )
+            with col3:
                 if st.button("X", key=f"del_{conv['id']}", help="Delete conversation"):
                     conversation_manager.delete_conversation(conv["id"], st.session_state.user_id)
                     if st.session_state.current_thread_id == conv["id"]:

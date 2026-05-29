@@ -234,6 +234,5 @@ fix_data.py
 
 # Demo/temp directories
 demo/
-.opencode/.DS_Store
 .vscode/
 data/.DS_Store
