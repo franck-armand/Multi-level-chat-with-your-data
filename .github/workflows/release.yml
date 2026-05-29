@@ -74,41 +74,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
-        id: changelog
-        uses: metcalfc/changelog-generator@v4.3.0
-        with:
-          myToken: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           body: |
-            ## What's Changed
-            
-            ${{ steps.changelog.outputs.changelog }}
-            
             ## Docker Images
-            
+
             ```bash
             docker pull ${{ secrets.DOCKER_USERNAME }}/chatwithdocs:${{ github.ref_name }}
             ```
-            
+
             ## Installation
-            
-            ### Using Docker
+
             ```bash
             docker run -p 8501:8501 ${{ secrets.DOCKER_USERNAME }}/chatwithdocs:${{ github.ref_name }}
-            ```
-            
-            ### Using pip
-            ```bash
-            pip install chatwithdocs==${{ github.ref_name }}
             ```
           files: |
             LICENSE
             README.md
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
