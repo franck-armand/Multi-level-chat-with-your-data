@@ -7,6 +7,7 @@ from typing import Any
 from chatwithdocs.embedding import EmbeddingRouter
 from chatwithdocs.ingestion.base import Chunk, Extractor
 from chatwithdocs.ingestion.extractors.docx import DOCXExtractor
+from chatwithdocs.ingestion.extractors.marker import MarkerPDFExtractor
 from chatwithdocs.ingestion.extractors.pdf import PDFExtractor
 from chatwithdocs.ingestion.extractors.structured import StructuredExtractor
 from chatwithdocs.ingestion.extractors.text import TextExtractor
@@ -43,6 +44,7 @@ class IngestionPipeline:
 
         # Register extractors
         self._extractors: list[Extractor] = [
+            MarkerPDFExtractor(),
             PDFExtractor(),
             DOCXExtractor(),
             StructuredExtractor(),
