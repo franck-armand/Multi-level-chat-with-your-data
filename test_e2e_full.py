@@ -131,7 +131,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print("\nThe Edan-V2 RAG system is fully operational!")
         print("\nYou can now:")
-        print("1. Run the Streamlit UI: streamlit run app/streamlit_app_v2.py")
+        print("1. Run the Streamlit UI: streamlit run app/streamlit_app.py")
         print("2. Upload documents through the web interface")
         print("3. Chat with AI that retrieves from your documents")
     else:

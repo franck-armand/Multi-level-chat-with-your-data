@@ -341,7 +341,7 @@ def cmd_server(args: argparse.Namespace) -> int:
             [
                 "streamlit",
                 "run",
-                "app/streamlit_app_v2.py",
+                "app/streamlit_app.py",
                 "--server.port",
                 str(args.port),
                 "--server.address",
