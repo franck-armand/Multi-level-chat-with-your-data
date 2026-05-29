@@ -69,3 +69,8 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]
