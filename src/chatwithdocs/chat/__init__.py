@@ -7,9 +7,12 @@ from __future__ import annotations
 #   from chatwithdocs.chat.persistence import ChatPersistence
 
 from chatwithdocs.chat.models import Citation, Message, MessageRole, Thread
+from chatwithdocs.chat.models_doc import Collection, Document
 
 __all__ = [
     "Citation",
+    "Collection",
+    "Document",
     "Message",
     "MessageRole",
     "Thread",
