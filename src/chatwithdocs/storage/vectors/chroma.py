@@ -93,6 +93,9 @@ class ChromaVectorStore(VectorStore):
         if metadata.user_id is not None:
             result["user_id"] = metadata.user_id
 
+        if metadata.doc_id is not None:
+            result["doc_id"] = metadata.doc_id
+
         # Flatten custom metadata with prefix to avoid collisions
         for key, value in metadata.custom.items():
             result[f"custom_{key}"] = value
@@ -337,6 +340,40 @@ class ChromaVectorStore(VectorStore):
         )
 
         logger.info(f"Deleted {len(ids_to_delete)} chunks from source: {source_file}")
+        return len(ids_to_delete)
+
+    async def delete_by_doc_id(self, doc_id: str) -> int:
+        """Delete all chunks belonging to a document.
+
+        Args:
+            doc_id: Document identifier
+
+        Returns:
+            Number of chunks deleted
+        """
+        collection = self._get_collection()
+
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: collection.get(
+                where={"doc_id": doc_id},
+                include=[],
+            ),
+        )
+
+        if not results["ids"]:
+            return 0
+
+        ids_to_delete = results["ids"]
+        await loop.run_in_executor(
+            None,
+            lambda: collection.delete(ids=ids_to_delete),
+        )
+
+        logger.info(f"Deleted {len(ids_to_delete)} chunks for document: {doc_id}")
         return len(ids_to_delete)
 
     async def delete_by_id(self, chunk_id: str) -> bool:

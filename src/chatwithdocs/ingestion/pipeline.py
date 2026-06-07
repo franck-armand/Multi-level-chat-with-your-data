@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from chatwithdocs.chat.models_doc import Document
 from chatwithdocs.embedding import EmbeddingRouter
 from chatwithdocs.ingestion.base import Chunk, Extractor
 from chatwithdocs.ingestion.extractors.docx import DOCXExtractor
@@ -14,6 +15,7 @@ from chatwithdocs.ingestion.extractors.text import TextExtractor
 from chatwithdocs.retrieval import HybridSearcher
 from chatwithdocs.security import FileSandbox
 from chatwithdocs.security.audit import audit_logger
+from chatwithdocs.storage.document_registry import DocumentRegistry
 from chatwithdocs.storage.vectors import ChromaVectorStore, ChunkMetadata
 
 logger = logging.getLogger(__name__)
@@ -28,7 +30,8 @@ class IngestionPipeline:
     3. Chunking
     4. Embedding generation
     5. Vector storage
-    6. Audit logging
+    6. Document registration
+    7. Audit logging
     """
 
     def __init__(
@@ -36,11 +39,13 @@ class IngestionPipeline:
         vector_store: ChromaVectorStore | None = None,
         embedder: EmbeddingRouter | None = None,
         sandbox: FileSandbox | None = None,
+        doc_registry: DocumentRegistry | None = None,
     ):
         self.vector_store = vector_store or ChromaVectorStore()
         self.embedder = embedder or EmbeddingRouter()
         self.hybrid_searcher = HybridSearcher(self.vector_store, self.embedder)
         self.sandbox = sandbox or FileSandbox()
+        self.doc_registry = doc_registry or DocumentRegistry()
 
         # Register extractors
         self._extractors: list[Extractor] = [
@@ -100,6 +105,28 @@ class IngestionPipeline:
                 "chunks_indexed": 0,
             }
 
+        # Step 1b: Dedup check — skip if same hash already registered for this user
+        file_hash = sandbox_result.original_hash or ""
+        file_size = processed_path.stat().st_size if processed_path.exists() else 0
+        if file_hash:
+            existing = self.doc_registry.find_by_hash(user_id, file_hash)
+            if existing:
+                logger.info(f"Duplicate document detected: {existing.filename} (doc_id={existing.id})")
+                audit_logger.log_file_upload(
+                    user_id=user_id,
+                    filename=file_path.name,
+                    file_hash=file_hash,
+                    file_size=file_size,
+                    success=True,
+                )
+                return {
+                    "success": True,
+                    "duplicate": True,
+                    "doc_id": existing.id,
+                    "file_path": existing.file_path,
+                    "chunks_indexed": 0,
+                }
+
         # Step 2: Extract content
         try:
             extractor = self._get_extractor(processed_path)
@@ -134,32 +161,49 @@ class IngestionPipeline:
                 "chunks_indexed": 0,
             }
 
-        # Step 3: Generate embeddings and store
+        # Step 3: Register document before indexing (so we have doc_id for chunks)
+        doc = Document(
+            user_id=user_id,
+            filename=file_path.name,
+            file_hash=file_hash,
+            file_path=str(processed_path),
+            file_size=file_size,
+            file_type=processed_path.suffix.lstrip(".").lower(),
+        )
+        self.doc_registry.register(doc)
+        doc_id = doc.id
+
+        # Step 4: Generate embeddings and store
         try:
-            chunks_indexed = await self._index_chunks(extraction_result.chunks, user_id)
-            logger.info(f"Indexed {chunks_indexed} chunks")
+            chunks_indexed = await self._index_chunks(
+                extraction_result.chunks, user_id, doc_id=doc_id
+            )
+            self.doc_registry.update_chunk_count(doc_id, chunks_indexed)
+            logger.info(f"Indexed {chunks_indexed} chunks for doc {doc_id}")
 
         except Exception as e:
             error_msg = f"Indexing failed: {e}"
             logger.error(error_msg)
+            # Clean up the document record on failure
+            self.doc_registry.delete(doc_id)
             return {
                 "success": False,
                 "error": error_msg,
                 "chunks_indexed": 0,
             }
 
-        # Step 4: Audit logging
-        file_size = processed_path.stat().st_size if processed_path.exists() else 0
+        # Step 5: Audit logging
         audit_logger.log_file_upload(
             user_id=user_id,
             filename=file_path.name,
-            file_hash=sandbox_result.original_hash or "",
+            file_hash=file_hash,
             file_size=file_size,
             success=True,
         )
 
         return {
             "success": True,
+            "doc_id": doc_id,
             "file_path": str(processed_path),
             "chunks_indexed": chunks_indexed,
             "metadata": extraction_result.metadata,
@@ -173,12 +217,15 @@ class IngestionPipeline:
                 return extractor
         return None
 
-    async def _index_chunks(self, chunks: list[Chunk], user_id: str) -> int:
+    async def _index_chunks(
+        self, chunks: list[Chunk], user_id: str, doc_id: str | None = None
+    ) -> int:
         """Index chunks by generating embeddings and storing in vector DB.
 
         Args:
             chunks: List of chunks to index
             user_id: User ID for metadata
+            doc_id: Optional document ID to link chunks
 
         Returns:
             Number of chunks indexed
@@ -207,6 +254,7 @@ class IngestionPipeline:
                     section_header=chunk.section_header,
                     chunk_type=chunk.chunk_type,
                     user_id=user_id,
+                    doc_id=doc_id,
                     custom=chunk.metadata,
                 )
             )
@@ -231,6 +279,42 @@ class IngestionPipeline:
             return True
         except Exception as e:
             logger.error(f"Failed to delete chunks for {source_file}: {e}")
+            return False
+
+    async def delete_document(self, doc_id: str) -> bool:
+        """Delete a document and all its chunks.
+
+        Removes chunks from vector store + BM25, deletes the file from disk,
+        and removes the document record from the registry.
+
+        Args:
+            doc_id: Document ID to delete
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        try:
+            doc = self.doc_registry.get(doc_id)
+            if not doc:
+                logger.warning(f"Document {doc_id} not found in registry")
+                return False
+
+            # Remove chunks from vector store and BM25
+            await self.hybrid_searcher.delete_by_doc_id(doc_id)
+
+            # Remove file from disk
+            file_path = Path(doc.file_path)
+            if file_path.exists():
+                file_path.unlink()
+                logger.info(f"Deleted file: {file_path}")
+
+            # Remove document record (cascades collection_documents)
+            self.doc_registry.delete(doc_id)
+
+            logger.info(f"Deleted document {doc_id} ({doc.filename})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete document {doc_id}: {e}")
             return False
 
     def get_stats(self) -> dict[str, Any]:
