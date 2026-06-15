@@ -470,7 +470,9 @@ with st.sidebar:
                 "current_thread": st.session_state.current_thread_id,
                 "llm_provider": settings.llm_provider,
                 "llm_available": llm_available,
-                "uploaded_files": len(ingestion_pipeline.doc_registry.list_by_user(st.session_state.user_id)),
+                "uploaded_files": len(
+                    ingestion_pipeline.doc_registry.list_by_user(st.session_state.user_id)
+                ),
             }
         )
 
@@ -505,9 +507,7 @@ with st.sidebar:
 
             if result["success"]:
                 if result.get("duplicate"):
-                    st.info(
-                        f"[i] {uploaded_file.name}: already indexed (skipped duplicate)"
-                    )
+                    st.info(f"[i] {uploaded_file.name}: already indexed (skipped duplicate)")
                 else:
                     st.success(
                         f"[OK] {uploaded_file.name}: {result['chunks_indexed']} chunks indexed"

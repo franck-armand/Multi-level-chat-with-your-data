@@ -111,7 +111,9 @@ class IngestionPipeline:
         if file_hash:
             existing = self.doc_registry.find_by_hash(user_id, file_hash)
             if existing:
-                logger.info(f"Duplicate document detected: {existing.filename} (doc_id={existing.id})")
+                logger.info(
+                    f"Duplicate document detected: {existing.filename} (doc_id={existing.id})"
+                )
                 audit_logger.log_file_upload(
                     user_id=user_id,
                     filename=file_path.name,

@@ -307,9 +307,7 @@ async def list_documents(user_id: str = Depends(get_current_user_id)):
 
     try:
         docs = ingestion_pipeline.doc_registry.list_by_user(user_id)
-        return DocumentListResponse(
-            documents=[d.to_dict() for d in docs]
-        )
+        return DocumentListResponse(documents=[d.to_dict() for d in docs])
     except Exception as e:
         logger.error(f"List documents error: {e}")
         raise HTTPException(

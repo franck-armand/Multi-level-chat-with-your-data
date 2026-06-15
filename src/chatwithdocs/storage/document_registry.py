@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 from datetime import datetime, timezone
@@ -180,9 +179,7 @@ class DocumentRegistry:
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
             # Remove from any collections
-            cursor.execute(
-                "DELETE FROM collection_documents WHERE doc_id = ?", (doc_id,)
-            )
+            cursor.execute("DELETE FROM collection_documents WHERE doc_id = ?", (doc_id,))
             # Delete the document record
             cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
             conn.commit()
@@ -266,8 +263,7 @@ class DocumentRegistry:
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "DELETE FROM collection_documents "
-                "WHERE collection_id = ? AND doc_id = ?",
+                "DELETE FROM collection_documents WHERE collection_id = ? AND doc_id = ?",
                 (collection_id, doc_id),
             )
             conn.commit()
@@ -292,9 +288,7 @@ class DocumentRegistry:
                 "DELETE FROM collection_documents WHERE collection_id = ?",
                 (collection_id,),
             )
-            cursor.execute(
-                "DELETE FROM collections WHERE id = ?", (collection_id,)
-            )
+            cursor.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
             conn.commit()
             return cursor.rowcount > 0
 
