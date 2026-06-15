@@ -25,6 +25,7 @@ class ChunkMetadata:
     section_header: Optional[str] = None
     chunk_type: str = "text"
     user_id: Optional[str] = None
+    doc_id: Optional[str] = None
     custom: Dict[str, Any] = field(default_factory=dict)
 
 

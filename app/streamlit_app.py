@@ -46,7 +46,7 @@ if "current_thread_id" not in st.session_state:
     st.session_state.current_thread_id = None
 
 if "uploaded_files" not in st.session_state:
-    st.session_state.uploaded_files = []
+    st.session_state.uploaded_files = None  # lazy-load from DocumentRegistry
 
 if "llm_configured" not in st.session_state:
     st.session_state.llm_configured = False
@@ -470,7 +470,9 @@ with st.sidebar:
                 "current_thread": st.session_state.current_thread_id,
                 "llm_provider": settings.llm_provider,
                 "llm_available": llm_available,
-                "uploaded_files": len(st.session_state.uploaded_files),
+                "uploaded_files": len(
+                    ingestion_pipeline.doc_registry.list_by_user(st.session_state.user_id)
+                ),
             }
         )
 
@@ -498,51 +500,50 @@ with st.sidebar:
             temp_path = Path("/tmp") / uploaded_file.name
             temp_path.write_bytes(uploaded_file.getvalue())
 
-            # Check if already processed
-            if uploaded_file.name not in [f["name"] for f in st.session_state.uploaded_files]:
-                # Process through ingestion pipeline
-                result = asyncio.run(
-                    ingestion_pipeline.ingest_file(temp_path, st.session_state.user_id)
-                )
+            # Process through ingestion pipeline (handles dedup internally)
+            result = asyncio.run(
+                ingestion_pipeline.ingest_file(temp_path, st.session_state.user_id)
+            )
 
-                if result["success"]:
-                    st.session_state.uploaded_files.append(
-                        {
-                            "name": uploaded_file.name,
-                            "chunks": result["chunks_indexed"],
-                            "path": result["file_path"],
-                        }
-                    )
+            if result["success"]:
+                if result.get("duplicate"):
+                    st.info(f"[i] {uploaded_file.name}: already indexed (skipped duplicate)")
+                else:
                     st.success(
                         f"[OK] {uploaded_file.name}: {result['chunks_indexed']} chunks indexed"
                     )
-                else:
-                    st.error(f"[X] {uploaded_file.name}: {result['error']}")
+            else:
+                st.error(f"[X] {uploaded_file.name}: {result['error']}")
 
             progress_bar.progress((idx + 1) / len(uploaded_files))
 
+        # Refresh upload list from registry
+        st.session_state.uploaded_files = None
         progress_bar.empty()
         status_text.empty()
 
-    # Show uploaded files - compact display with expander
-    if st.session_state.uploaded_files:
-        file_count = len(st.session_state.uploaded_files)
-        with st.expander(f"Your Documents ({file_count} files)", expanded=file_count <= 5):
-            # Show first 5 files, then "+ X more" indicator
-            display_files = st.session_state.uploaded_files[:5]
-            for file_info in display_files:
-                with st.container():
+    # Load documents from registry (persisted, survives refresh)
+    docs = ingestion_pipeline.doc_registry.list_by_user(st.session_state.user_id)
+    if docs:
+        with st.expander(f"Your Documents ({len(docs)} files)", expanded=len(docs) <= 5):
+            for doc in docs[:10]:
+                col1, col2 = st.columns([5, 1])
+                with col1:
                     st.markdown(
                         f"""
                         <div class="file-card">
-                            <strong>{file_info["name"]}</strong><br/>
-                            <small class="text-secondary">{file_info["chunks"]} chunks indexed</small>
+                            <strong>{doc.filename}</strong><br/>
+                            <small class="text-secondary">{doc.chunk_count} chunks &middot; {doc.file_type}</small>
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
-            if file_count > 5:
-                st.caption(f"+ {file_count - 5} more file(s)...")
+                with col2:
+                    if st.button("🗑", key=f"del_doc_{doc.id}", help="Delete document"):
+                        asyncio.run(ingestion_pipeline.delete_document(doc.id))
+                        st.rerun()
+            if len(docs) > 10:
+                st.caption(f"+ {len(docs) - 10} more file(s)...")
 
     # Danger zone - Clear all data
     st.divider()
@@ -566,9 +567,13 @@ with st.sidebar:
         with col2:
             if st.button("Clear Everything", type="primary", use_container_width=True):
                 try:
-                    # Delete all user data
+                    # Delete all user data (conversations + chunks)
                     result = asyncio.run(chat_engine.delete_all_user_data(st.session_state.user_id))
-                    st.session_state.uploaded_files = []
+                    # Delete all document records
+                    docs = ingestion_pipeline.doc_registry.list_by_user(st.session_state.user_id)
+                    for doc in docs:
+                        asyncio.run(ingestion_pipeline.delete_document(doc.id))
+                    st.session_state.uploaded_files = None
                     st.session_state.current_thread_id = None
                     st.success(
                         f"[OK] Deleted {result['conversations_deleted']} conversations and "

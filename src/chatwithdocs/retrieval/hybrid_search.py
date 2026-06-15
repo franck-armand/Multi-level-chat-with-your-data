@@ -274,6 +274,7 @@ class HybridSearcher:
             section_header=data.get("section_header"),
             chunk_type=data.get("chunk_type", "text"),
             user_id=data.get("user_id"),
+            doc_id=data.get("doc_id"),
             custom={
                 k: v
                 for k, v in data.items()
@@ -285,6 +286,7 @@ class HybridSearcher:
                     "section_header",
                     "chunk_type",
                     "user_id",
+                    "doc_id",
                 ]
             },
         )
@@ -308,12 +310,19 @@ class HybridSearcher:
                 "section_header": m.section_header,
                 "chunk_type": m.chunk_type,
                 "user_id": m.user_id,
+                "doc_id": m.doc_id,
                 **m.custom,
             }
             for m in metadata
         ]
         self.bm25_index.add_documents(chunks, meta_dicts, ids)
         return ids
+
+    async def delete_by_doc_id(self, doc_id: str) -> int:
+        """Delete documents from both indexes by document ID."""
+        deleted = await self.vector_store.delete_by_doc_id(doc_id)
+        self.bm25_index.delete({"doc_id": doc_id})
+        return deleted
 
     async def delete_by_source(self, source_file: str) -> None:
         """Delete documents from both indexes by source."""

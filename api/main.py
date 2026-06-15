@@ -101,7 +101,15 @@ class UploadResponse(BaseModel):
     success: bool
     filename: str
     chunks_indexed: int
+    doc_id: str | None = None
+    duplicate: bool = False
     error: str | None = None
+
+
+class DocumentListResponse(BaseModel):
+    """Document list response."""
+
+    documents: list[dict]
 
 
 class ErrorResponse(BaseModel):
@@ -261,6 +269,8 @@ async def upload_file(
             success=result["success"],
             filename=file.filename,
             chunks_indexed=result.get("chunks_indexed", 0),
+            doc_id=result.get("doc_id"),
+            duplicate=result.get("duplicate", False),
             error=result.get("error"),
         )
 
@@ -276,6 +286,84 @@ async def upload_file(
             if isinstance(temp_path_value, Path) and temp_path_value.exists():
                 temp_path_value.unlink()
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+# Document management endpoints
+@app.get("/api/documents", response_model=DocumentListResponse, tags=["Documents"])
+async def list_documents(user_id: str = Depends(get_current_user_id)):
+    """List all uploaded documents for a user.
+
+    Args:
+        user_id: User identifier resolved from request header
+
+    Returns:
+        List of documents with metadata
+    """
+    if not ingestion_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Ingestion pipeline not initialized",
+        )
+
+    try:
+        docs = ingestion_pipeline.doc_registry.list_by_user(user_id)
+        return DocumentListResponse(documents=[d.to_dict() for d in docs])
+    except Exception as e:
+        logger.error(f"List documents error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list documents: {str(e)}",
+        )
+
+
+@app.delete("/api/documents/{doc_id}", tags=["Documents"])
+async def delete_document(doc_id: str, user_id: str = Depends(get_current_user_id)):
+    """Delete a document and all its indexed chunks.
+
+    Args:
+        doc_id: Document ID to delete
+        user_id: User identifier resolved from request header
+
+    Returns:
+        Deletion status
+    """
+    if not ingestion_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Ingestion pipeline not initialized",
+        )
+
+    try:
+        # Verify ownership
+        doc = ingestion_pipeline.doc_registry.get(doc_id)
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found",
+            )
+        if doc.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
+
+        success = await ingestion_pipeline.delete_document(doc_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete document",
+            )
+
+        return {"success": True, "message": "Document deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete document error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete document: {str(e)}",
+        )
 
 
 # List conversations endpoint
